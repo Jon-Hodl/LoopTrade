@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LoopTrade - Automated Bitcoin Trading</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #16162a;
+            --bg-tertiary: #1e1e3f;
+            --accent-orange: #f7931a;
+            --accent-green: #00d084;
+            --accent-red: #ef4444;
+            --gradient-primary: linear-gradient(135deg, #f7931a 0%, #ff6b35 100%);
+            --gradient-success: linear-gradient(135deg, #00d084 0%, #00b068 100%);
+            --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b0;
+            --text-muted: #6b6b7b;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            background-image: 
+                radial-gradient(ellipse at top, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at bottom right, rgba(247, 147, 26, 0.1) 0%, transparent 50%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+        
+        .landing-container {
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        /* Logo */
+        .logo-section {
+            margin-bottom: 40px;
+        }
+        
+        .logo-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            position: relative;
+        }
+        
+        .logo-icon::before {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            background: var(--gradient-primary);
+            border-radius: 50%;
+            opacity: 0.5;
+            filter: blur(20px);
+        }
+        
+        .logo-icon-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: var(--gradient-primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(247, 147, 26, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+            font-size: 40px;
+        }
+        
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 48px;
+            letter-spacing: -1px;
+            margin-bottom: 16px;
+        }
+        
+        .loop-text {
+            background: linear-gradient(135deg, #fff 0%, #a0a0b0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .trade-text {
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .tagline {
+            font-size: 20px;
+            color: var(--text-secondary);
+            margin-bottom: 60px;
+            line-height: 1.5;
+        }
+        
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 60px;
+        }
+        
+        @media (max-width: 600px) {
+            .action-buttons {
+                flex-direction: column;
+            }
+        }
+        
+        .action-btn {
+            flex: 1;
+            padding: 32px 24px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-4px);
+        }
+        
+        .btn-long {
+            background: linear-gradient(145deg, rgba(34, 197, 94, 0.15) 0%, rgba(22, 163, 74, 0.1) 100%);
+            border: 2px solid #22c55e;
+            box-shadow: 0 8px 32px rgba(34, 197, 94, 0.2);
+        }
+        
+        .btn-long:hover {
+            background: linear-gradient(145deg, rgba(34, 197, 94, 0.25) 0%, rgba(22, 163, 74, 0.15) 100%);
+            box-shadow: 0 12px 40px rgba(34, 197, 94, 0.3);
+        }
+        
+        .btn-short {
+            background: linear-gradient(145deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%);
+            border: 2px solid #ef4444;
+            box-shadow: 0 8px 32px rgba(239, 68, 68, 0.2);
+        }
+        
+        .btn-short:hover {
+            background: linear-gradient(145deg, rgba(239, 68, 68, 0.25) 0%, rgba(220, 38, 38, 0.15) 100%);
+            box-shadow: 0 12px 40px rgba(239, 68, 68, 0.3);
+        }
+        
+        .btn-icon {
+            font-size: 40px;
+        }
+        
+        .btn-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+        }
+        
+        .btn-long .btn-title {
+            color: #22c55e;
+        }
+        
+        .btn-short .btn-title {
+            color: #ef4444;
+        }
+        
+        .btn-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        
+        /* Links Section */
+        .links-section {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 24px;
+        }
+        
+        .link-item {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .link-item:hover {
+            color: var(--accent-orange);
+        }
+        
+        .link-separator {
+            color: var(--text-muted);
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    <div class="landing-container">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <div class="logo-icon">
+                <div class="logo-icon-inner">🔁</div>
+            </div>
+            <h1>
+                <span class="loop-text">Loop</span><span class="trade-text">Trade</span>
+            </h1>
+            <p class="tagline">Automated bitcoin trading on LN Markets<br>Grid strategies that work while you sleep</p>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <a href="/app?direction=long" class="action-btn btn-long">
+                <span class="btn-icon">📈</span>
+                <span class="btn-title">Buy / Long</span>
+                <span class="btn-desc">Buy low first, then sell higher.<br>Profit when Bitcoin price goes up.</span>
+            </a>
+            <a href="/app?direction=short" class="action-btn btn-short">
+                <span class="btn-icon">📉</span>
+                <span class="btn-title">Sell / Short</span>
+                <span class="btn-desc">Sell high first, then buy back lower.<br>Profit when Bitcoin price goes down.</span>
+            </a>
+        </div>
+        
+        <!-- Links -->
+        <div class="links-section">
+            <a href="/app" class="link-item">Open Dashboard →</a>
+            <span class="link-separator">|</span>
+            <a href="#" class="link-item" onclick="alert('Documentation coming soon!'); return false;">Documentation</a>
+            <span class="link-separator">|</span>
+            <a href="https://lnmarkets.com" target="_blank" class="link-item">LNMarkets →</a>
+            <span class="link-separator">|</span>
+            <a href="https://github.com" target="_blank" class="link-item">GitHub →</a>
+        </div>
+    </div>
+</body>
+</html>

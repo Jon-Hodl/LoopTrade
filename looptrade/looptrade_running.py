@@ -333,8 +333,6 @@ class Bot:
             entry_label = "BUY"
             exit_label = "SELL"
         
-        just_completed_loop = False  # Flag to skip price validation after loop completion
-        
         while True:
             try:
                 if not pid:
@@ -349,22 +347,16 @@ class Bot:
                     price = round(entry_price * 2) / 2
                     
                     # Check if entry price is valid for current market
-                    # Skip this check if we just completed a loop (immediate re-entry)
-                    if not just_completed_loop:
-                        if direction == 'long' and price >= current_price:
-                            print(f"[{name}] SKIPPED: Buy price ${price:,.0f} is at or above current market price ${current_price:,.0f}")
-                            print(f"[{name}] Waiting for price to drop below ${price:,.0f}...")
-                            await asyncio.sleep(CHECK_SECONDS)
-                            continue
-                        elif direction == 'short' and price <= current_price:
-                            print(f"[{name}] SKIPPED: Sell price ${price:,.0f} is at or below current market price ${current_price:,.0f}")
-                            print(f"[{name}] Waiting for price to rise above ${price:,.0f}...")
-                            await asyncio.sleep(CHECK_SECONDS)
-                            continue
-                    else:
-                        # We just completed a loop - log that we're re-entering immediately
-                        print(f"[{name}] LOOP CONTINUATION: Immediately placing new entry order at ${price:,.0f} (market: ${current_price:,.0f})")
-                        just_completed_loop = False  # Reset the flag
+                    if direction == 'long' and price >= current_price:
+                        print(f"[{name}] SKIPPED: Buy price ${price:,.0f} is at or above current market price ${current_price:,.0f}")
+                        print(f"[{name}] Waiting for price to drop below ${price:,.0f}...")
+                        await asyncio.sleep(CHECK_SECONDS)
+                        continue
+                    elif direction == 'short' and price <= current_price:
+                        print(f"[{name}] SKIPPED: Sell price ${price:,.0f} is at or below current market price ${current_price:,.0f}")
+                        print(f"[{name}] Waiting for price to rise above ${price:,.0f}...")
+                        await asyncio.sleep(CHECK_SECONDS)
+                        continue
                     
                     # Check global tracker for orders being placed by other loops
                     if is_price_being_placed(price):
@@ -493,13 +485,11 @@ class Bot:
                         # Remove from tracking so we can place new entry order
                         unmark_price_placing(entry_price)
                         pid = None  # Reset to place new entry order
-                        just_completed_loop = True  # Flag to skip price validation on next iteration
                     else:
                         # Order ID not found anywhere — may have been cancelled
                         print(f"[{name}] Order {pid[:8]} not found, resetting...")
                         unmark_price_placing(entry_price)
                         pid = None
-                        just_completed_loop = False  # Don't skip validation on unexpected reset
                 
                 await asyncio.sleep(CHECK_SECONDS)
             except Exception as e:
