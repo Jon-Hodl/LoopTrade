@@ -2267,6 +2267,9 @@ class Bot:
         started_prices = set()  # Track which prices we've already started loops for
         synced = False  # Track if we've done initial sync
         
+        # Start periodic rescan task to ensure all loops have orders
+        rescan_task = asyncio.create_task(self.periodic_rescan(interval_minutes=5))
+        
         while True:
             try:
                 # Reload config to check for new loops
@@ -2313,6 +2316,179 @@ class Bot:
             except Exception as e:
                 print(f"Error checking for new loops: {e}")
                 await asyncio.sleep(5)
+    
+    async def periodic_rescan(self, interval_minutes=5):
+        """Periodically rescan and ensure all loops have orders placed"""
+        while True:
+            try:
+                await asyncio.sleep(interval_minutes * 60)  # Wait for interval
+                
+                print(f"[RESCAN] Running periodic rescan to ensure all loops have orders...")
+                
+                # Get current state
+                config = load_config()
+                loops = config.get('loops', [])
+                enabled_loops = [l for l in loops if l.get('enabled', True)]
+                
+                if not enabled_loops:
+                    continue
+                
+                # Get open orders from LN Markets
+                open_trades_list, running_trades_list, _ = await get_cached_positions(self.client)
+                
+                # Count unique prices with orders
+                orders_by_price = {}
+                for order in open_trades_list:
+                    try:
+                        price = round(order.price * 2) / 2
+                        orders_by_price[price] = order.id
+                    except:
+                        pass
+                
+                for pos in running_trades_list:
+                    try:
+                        price = round(pos.price * 2) / 2
+                        orders_by_price[price] = pos.id
+                    except:
+                        pass
+                
+                total_orders = len(orders_by_price)
+                expected_orders = len(enabled_loops)
+                
+                print(f"[RESCAN] Found {total_orders} orders on LN Markets, {expected_orders} enabled loops configured")
+                
+                # If counts don't match, trigger a mirror operation
+                if total_orders != expected_orders:
+                    print(f"[RESCAN] MISMATCH: Have {total_orders}, need {expected_orders}. Running mirror...")
+                    
+                    # Find missing loops
+                    for loop in enabled_loops:
+                        direction = loop.get('direction', 'long')
+                        if direction == 'short':
+                            entry_price = round(loop['sell_price'] * 2) / 2
+                        else:
+                            entry_price = round(loop['buy_price'] * 2) / 2
+                        
+                        if entry_price not in orders_by_price:
+                            print(f"[RESCAN] Missing order for '{loop.get('name')}' @ ${entry_price:,.0f}")
+                    
+                    # Trigger mirror to fix
+                    await self.run_mirror()
+                else:
+                    print(f"[RESCAN] All {expected_orders} loops have orders. No action needed.")
+                    
+            except Exception as e:
+                print(f"[RESCAN] Error during periodic rescan: {e}")
+    
+    async def run_mirror(self):
+        """Run mirror operation to sync loops with LN Markets"""
+        try:
+            print("[MIRROR] Starting mirror operation...")
+            
+            config = load_config()
+            loops = config.get('loops', [])
+            enabled_loops = [l for l in loops if l.get('enabled', True)]
+            
+            # Get all orders from LN Markets
+            await _rate_limiter.wait()
+            open_trades_list = await self.client.futures.isolated.get_open_trades()
+            _rate_limiter.report_success()
+            
+            await _rate_limiter.wait()
+            running_trades_list = await self.client.futures.isolated.get_running_trades()
+            _rate_limiter.report_success()
+            
+            # Build map of existing orders by price
+            existing_prices = {}
+            for order in open_trades_list:
+                try:
+                    price = round(order.price * 2) / 2
+                    existing_prices[price] = order
+                except:
+                    pass
+            
+            for pos in running_trades_list:
+                try:
+                    price = round(pos.price * 2) / 2
+                    existing_prices[price] = pos
+                except:
+                    pass
+            
+            placed = 0
+            for loop in enabled_loops:
+                try:
+                    direction = loop.get('direction', 'long')
+                    buy_price = loop['buy_price']
+                    sell_price = loop['sell_price']
+                    qty = loop['quantity_usd']
+                    leverage = loop.get('leverage', 1)
+                    
+                    if direction == 'short':
+                        entry_price = round(sell_price * 2) / 2
+                        entry_side = 'sell'
+                        exit_price = buy_price
+                    else:
+                        entry_price = round(buy_price * 2) / 2
+                        entry_side = 'buy'
+                        exit_price = sell_price
+                    
+                    # Check if order already exists
+                    if entry_price in existing_prices:
+                        continue
+                    
+                    # Skip if price check would fail (below/above market)
+                    current_price = await get_cached_ticker(self.client)
+                    if not current_price:
+                        continue
+                    
+                    if direction == 'long' and entry_price >= current_price:
+                        print(f"[MIRROR] SKIPPED: {loop.get('name')} - buy price ${entry_price:,.0f} above market ${current_price:,.0f}")
+                        continue
+                    elif direction == 'short' and entry_price <= current_price:
+                        print(f"[MIRROR] SKIPPED: {loop.get('name')} - sell price ${entry_price:,.0f} below market ${current_price:,.0f}")
+                        continue
+                    
+                    # Place the order
+                    if is_price_being_placed(entry_price):
+                        continue
+                    
+                    mark_price_placing(entry_price)
+                    
+                    params = FuturesOrder(
+                        type='limit',
+                        side=entry_side,
+                        price=float(entry_price),
+                        leverage=float(leverage),
+                        quantity=float(qty)
+                    )
+                    
+                    await _rate_limiter.wait()
+                    resp = await self.client.futures.isolated.new_trade(params)
+                    _rate_limiter.report_success()
+                    
+                    # Set takeprofit
+                    try:
+                        tp_params = UpdateTakeprofitParams(id=resp.id, value=float(exit_price))
+                        await _rate_limiter.wait()
+                        await self.client.futures.isolated.update_takeprofit(tp_params)
+                        _rate_limiter.report_success()
+                    except Exception as e:
+                        print(f"[MIRROR] Warning: Could not set takeprofit: {e}")
+                    
+                    unmark_price_placing(entry_price)
+                    print(f"[MIRROR] Placed {entry_side} order for '{loop.get('name')}' @ ${entry_price:,.0f}")
+                    placed += 1
+                    
+                    await asyncio.sleep(2)  # Rate limiting
+                    
+                except Exception as e:
+                    print(f"[MIRROR] Error placing order for {loop.get('name')}: {e}")
+                    unmark_price_placing(entry_price)
+            
+            print(f"[MIRROR] Complete! Placed {placed} missing orders")
+            
+        except Exception as e:
+            print(f"[MIRROR] Error: {e}")
 
 async def main():
     async with Bot() as bot:
