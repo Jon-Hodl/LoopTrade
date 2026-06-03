@@ -6,18 +6,18 @@
     <string>com.looptrade.server</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
-        <string>/Users/hal/.openclaw/workspace/looptrade/start.sh</string>
+        <string>/usr/local/bin/python3</string>
+        <string>/Users/hal/LoopTrade/looptrade.py</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>/Users/hal/.openclaw/workspace/looptrade</string>
+    <string>/Users/hal/LoopTrade</string>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/Users/hal/.openclaw/workspace/looptrade/server.log</string>
+    <string>/Users/hal/LoopTrade/server.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/hal/.openclaw/workspace/looptrade/server.error.log</string>
+    <string>/Users/hal/LoopTrade/server.error.log</string>
 </dict>
 </plist>
