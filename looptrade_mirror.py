@@ -7,9 +7,10 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Add virtual environment to path if it exists  
 venv_paths = [
-    os.path.join(SCRIPT_DIR, 'venv', 'lib', 'python3.13', 'site-packages'),
-    os.path.join(SCRIPT_DIR, 'venv', 'lib', 'python3.12', 'site-packages'),
+    os.path.join(SCRIPT_DIR, 'venv', 'lib', 'python3.9', 'site-packages'),
+    os.path.join(SCRIPT_DIR, 'venv', 'lib', 'python3.10', 'site-packages'),
     os.path.join(SCRIPT_DIR, 'venv', 'lib', 'python3.11', 'site-packages'),
+    os.path.join(SCRIPT_DIR, '..', 'venv', 'lib', 'python3.9', 'site-packages'),
 ]
 for venv_path in venv_paths:
     if os.path.exists(venv_path) and venv_path not in sys.path:
