@@ -1073,8 +1073,8 @@
                             <h3>{{ item.name }} <span class="loop-direction-badge {{ item.direction or 'long' }}">{{ (item.direction or 'long')|upper }}</span> <span style="background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 13px; margin-left: 8px;">{{ item.leverage or 1 }}x</span></h3>
                             <p>
                                 {% if item.direction == 'short' %}
-                                Sell <span class="loop-price">${{ "{:,.0f}".format(item.buy_price) }}</span>
-                                → Buy <span class="loop-price">${{ "{:,.0f}".format(item.sell_price) }}</span>
+                                Sell <span class="loop-price">${{ "{:,.0f}".format(item.sell_price) }}</span>
+                                → Buy <span class="loop-price">${{ "{:,.0f}".format(item.buy_price) }}</span>
                                 {% else %}
                                 Buy <span class="loop-price">${{ "{:,.0f}".format(item.buy_price) }}</span>
                                 → Sell <span class="loop-price">${{ "{:,.0f}".format(item.sell_price) }}</span>
