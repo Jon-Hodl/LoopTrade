@@ -1027,9 +1027,15 @@
                         <h3 style="margin: 0; font-size: 16px; color: var(--text-primary);">🧠 Barry Presets</h3>
                         <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-secondary);">AI-generated grid based on Fear & Greed Index</p>
                     </div>
-                    <button class="btn btn-primary" onclick="loadBarryPreset()" style="background: linear-gradient(135deg, #8b5cf6 0%, #f7931a 100%); border: none; padding: 10px 20px; font-size: 13px; font-weight: 600;">
-                        ⚡ Generate Barry Loops
-                    </button>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-secondary);">
+                            <input type="checkbox" id="eliteModeToggle" style="accent-color: #f7931a;">
+                            <span style="color: #f7931a; font-weight: 600;">⚡ ELITE MODE</span>
+                        </label>
+                        <button class="btn btn-primary" onclick="loadBarryPreset()" style="background: linear-gradient(135deg, #8b5cf6 0%, #f7931a 100%); border: none; padding: 10px 20px; font-size: 13px; font-weight: 600;">
+                            Generate Barry Loops
+                        </button>
+                    </div>
                 </div>
                 
                 <div id="barryPreview" style="display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
@@ -2926,12 +2932,15 @@
         // Load Barry Preset
         async function loadBarryPreset() {
             try {
-                const response = await fetch('/api/presets/barry');
+                const isElite = document.getElementById('eliteModeToggle').checked;
+                const endpoint = isElite ? '/api/presets/barry/elite' : '/api/presets/barry';
+                
+                const response = await fetch(endpoint);
                 const data = await response.json();
                 
                 if (data.success) {
                     barryPresetData = data.preset;
-                    displayBarryPreview(data.preset);
+                    displayBarryPreview(data.preset, isElite, data.features);
                 } else {
                     alert('Failed to load Barry preset: ' + (data.error || 'Unknown error'));
                 }
@@ -2942,7 +2951,7 @@
         }
         
         // Display Barry Preview
-        function displayBarryPreview(preset) {
+        function displayBarryPreview(preset, isElite = false, eliteFeatures = null) {
             const preview = document.getElementById('barryPreview');
             const strategy = document.getElementById('barryStrategy');
             const fng = document.getElementById('barryFNG');
@@ -2976,21 +2985,53 @@
                 const action = isLong ? 'Buy' : 'Sell';
                 const exit = isLong ? 'Sell' : 'Buy';
                 
+                // Elite mode: show extra metadata
+                let eliteMeta = '';
+                if (isElite && loop.meta) {
+                    eliteMeta = `
+                        <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 10px; color: #f7931a;">
+                            📊 Prob: ${loop.meta.profit_probability} | EV: ${loop.meta.expected_value} | ${loop.meta.based_on}
+                        </div>
+                    `;
+                }
+                
                 return `
-                    <div style="background: rgba(0,0,0,0.3); border: 1px solid ${color}40; border-radius: 8px; padding: 10px; font-size: 12px;">
+                    <div style="background: rgba(0,0,0,0.3); border: 1px solid ${color}40; border-radius: 8px; padding: 10px; font-size: 12px; ${isElite ? 'border-left: 3px solid #f7931a;' : ''}">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                             <span style="color: ${color}; font-weight: 600;">${arrow} ${loop.name}</span>
                             <span style="background: ${color}20; color: ${color}; padding: 2px 6px; border-radius: 4px; font-size: 10px; text-transform: uppercase;">${loop.direction}</span>
                         </div>
                         <div style="color: var(--text-secondary);">
-                            ${action} $${loop.buy_price.toLocaleString()} → ${exit} $${loop.sell_price.toLocaleString()}
+                            ${action} $${Math.round(loop.buy_price).toLocaleString()} → ${exit} $${Math.round(loop.sell_price).toLocaleString()}
                         </div>
                         <div style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">
-                            Spread: $${(loop.sell_price - loop.buy_price).toLocaleString()} | ${loop.leverage}x leverage
+                            Spread: $${Math.round(loop.sell_price - loop.buy_price).toLocaleString()} | ${loop.leverage}x lev | $${loop.quantity_usd} size
                         </div>
+                        ${eliteMeta}
                     </div>
                 `;
             }).join('');
+            
+            // Add elite features section
+            if (isElite && eliteFeatures) {
+                loopsContainer.innerHTML += `
+                    <div style="grid-column: 1 / -1; background: linear-gradient(135deg, rgba(247, 147, 26, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border: 1px solid rgba(247, 147, 26, 0.3); border-radius: 8px; padding: 12px; margin-top: 8px;">
+                        <div style="font-size: 13px; font-weight: 600; color: #f7931a; margin-bottom: 8px;">⚡ ELITE BARRY INTELLIGENCE</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.6;">
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
+                                ${eliteFeatures.map(f => `<div>• ${f}</div>`).join('')}
+                            </div>
+                        </div>
+                        ${preset.regime ? `
+                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+                                <div style="font-size: 11px; color: var(--text-muted);">Detected Regime: <span style="color: #22c55e; font-weight: 600;">${preset.regime}</span></div>
+                                ${preset.atr_14 ? `<div style="font-size: 11px; color: var(--text-muted);">ATR(14): <span style="color: #f7931a;">$${preset.atr_14}</span></div>` : ''}
+                                ${preset.total_expected_value ? `<div style="font-size: 11px; color: var(--text-muted);">Total Expected Value: <span style="color: #22c55e; font-weight: 600;">$${preset.total_expected_value}</span></div>` : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
         }
         
         // Hide Barry Preview
