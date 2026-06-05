@@ -129,6 +129,184 @@ def get_loops():
     config = load_config()
     return jsonify(config.get('loops', []))
 
+def get_current_btc_price():
+    """Fetch current BTC price"""
+    import urllib.request
+    import ssl
+    
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        
+        with urllib.request.urlopen(req, context=ctx, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            return data['bitcoin']['usd']
+    except:
+        return None
+
+def generate_barry_preset(fng_value, fng_classification):
+    """Generate Barry preset loops based on Fear & Greed Index
+    
+    Barry adapts to market sentiment:
+    - Extreme Fear (0-24): Heavy short bias (8 short, 2 long)
+    - Fear (25-44): Moderate short bias (7 short, 3 long)
+    - Neutral (45-55): Balanced (5 short, 5 long)
+    - Greed (56-75): Moderate long bias (7 long, 3 short)
+    - Extreme Greed (76-100): Heavy long bias (8 long, 2 short)
+    """
+    current_price = get_current_btc_price()
+    if not current_price:
+        current_price = 65000  # fallback
+    
+    base_price = round(current_price / 500) * 500  # Round to nearest 500
+    
+    # Define strategy based on Fear & Greed
+    if fng_value <= 24:  # Extreme Fear
+        strategy = "extreme_fear"
+        long_count = 2
+        short_count = 8
+        description = "Extreme Fear Strategy - Heavy short bias anticipating further downside"
+    elif fng_value <= 44:  # Fear
+        strategy = "fear"
+        long_count = 3
+        short_count = 7
+        description = "Fear Strategy - Moderate short bias with some long hedges"
+    elif fng_value <= 55:  # Neutral
+        strategy = "neutral"
+        long_count = 5
+        short_count = 5
+        description = "Neutral Strategy - Balanced grid for range-bound markets"
+    elif fng_value <= 75:  # Greed
+        strategy = "greed"
+        long_count = 7
+        short_count = 3
+        description = "Greed Strategy - Moderate long bias with short hedges"
+    else:  # Extreme Greed
+        strategy = "extreme_greed"
+        long_count = 8
+        short_count = 2
+        description = "Extreme Greed Strategy - Heavy long bias anticipating further upside"
+    
+    loops = []
+    
+    # Generate LONG loops (buy below, sell above)
+    for i in range(long_count):
+        # Create descending buy prices below current market
+        buy_offset = 2000 + (i * 1500)  # 2000, 3500, 5000, etc. below
+        sell_offset = 700 + (i * 100)   # 700, 800, 900, etc. above buy
+        
+        buy_price = base_price - buy_offset
+        sell_price = buy_price + sell_offset
+        
+        loops.append({
+            'id': i + 1,
+            'name': f"Barry Long {i+1}",
+            'direction': 'long',
+            'buy_price': float(buy_price),
+            'sell_price': float(sell_price),
+            'quantity_usd': 10.0,
+            'leverage': 2,
+            'enabled': True
+        })
+    
+    # Generate SHORT loops (sell above, buy below)
+    for i in range(short_count):
+        # Create ascending sell prices above current market
+        sell_offset = 2000 + (i * 1500)  # 2000, 3500, 5000, etc. above
+        buy_offset = 700 + (i * 100)     # 700, 800, 900, etc. below sell
+        
+        sell_price = base_price + sell_offset
+        buy_price = sell_price - buy_offset
+        
+        loops.append({
+            'id': long_count + i + 1,
+            'name': f"Barry Short {i+1}",
+            'direction': 'short',
+            'buy_price': float(buy_price),
+            'sell_price': float(sell_price),
+            'quantity_usd': 10.0,
+            'leverage': 2,
+            'enabled': True
+        })
+    
+    return {
+        'strategy': strategy,
+        'description': description,
+        'fng_value': fng_value,
+        'fng_classification': fng_classification,
+        'base_price': base_price,
+        'long_count': long_count,
+        'short_count': short_count,
+        'loops': loops
+    }
+
+@app.route('/api/presets/barry', methods=['GET'])
+def get_barry_preset():
+    """Get Barry preset loops based on current Fear & Greed Index"""
+    try:
+        # Fetch current Fear & Greed
+        import urllib.request
+        import ssl
+        
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        url = "https://api.alternative.me/fng/?limit=1"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        
+        with urllib.request.urlopen(req, context=ctx, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            
+            if data.get('data') and len(data['data']) > 0:
+                fng = data['data'][0]
+                value = int(fng['value'])
+                classification = fng['value_classification']
+                
+                preset = generate_barry_preset(value, classification)
+                return jsonify({
+                    'success': True,
+                    'preset': preset
+                })
+        
+        return jsonify({'success': False, 'error': 'Unable to fetch Fear & Greed data'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/presets/barry/apply', methods=['POST'])
+def apply_barry_preset():
+    """Apply Barry preset to config"""
+    try:
+        data = request.json
+        loops = data.get('loops', [])
+        
+        if not loops:
+            return jsonify({'success': False, 'error': 'No loops provided'})
+        
+        config = load_config()
+        
+        # Clear existing loops (optional - can be disabled)
+        # config['loops'] = []
+        
+        # Add Barry loops
+        for loop in loops:
+            loop['id'] = len(config['loops']) + 1
+            config['loops'].append(loop)
+        
+        save_config(config)
+        
+        return jsonify({
+            'success': True,
+            'message': f"Applied {len(loops)} Barry preset loops",
+            'total_loops': len(config['loops'])
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/api/loops', methods=['POST'])
 def add_loop():
     """Add a new loop"""
