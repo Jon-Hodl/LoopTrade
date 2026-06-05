@@ -986,6 +986,8 @@ def get_market_history():
                     stats = daily_stats[date]
                     spread = stats['high'] - stats['low']
                     volatility = (spread / stats['open']) * 100
+                    price_change = stats['close'] - stats['open']
+                    direction = 'up' if price_change > 0 else 'down' if price_change < 0 else 'flat'
                     
                     history.append({
                         'date': date,
@@ -994,7 +996,9 @@ def get_market_history():
                         'open': round(stats['open'], 2),
                         'close': round(stats['close'], 2),
                         'spread': round(spread, 2),
-                        'volatility': round(volatility, 2)
+                        'volatility': round(volatility, 2),
+                        'direction': direction,
+                        'price_change': round(price_change, 2)
                     })
                 
                 all_highs = [h['high'] for h in history]
