@@ -1,0 +1,19 @@
+{
+  "api_key": "YOUR_LNMARKETS_API_KEY",
+  "api_secret": "YOUR_LNMARKETS_API_SECRET",
+  "api_passphrase": "YOUR_PASSPHRASE",
+  "leverage": 2,
+  "check_seconds": 30,
+  "loops": [
+    {
+      "id": 1,
+      "name": "Grid Loop 1",
+      "direction": "long",
+      "buy_price": 60000,
+      "sell_price": 61000,
+      "quantity_usd": 10,
+      "leverage": 2,
+      "enabled": true
+    }
+  ]
+}

@@ -1731,8 +1731,15 @@
                         created++;
                     } else {
                         failed++;
+                        console.error(`Failed to create loop ${i+1}:`, await response.text());
+                    }
+                    
+                    // Small delay between requests to prevent overwhelming the server
+                    if (i < loopCount - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
                     }
                 } catch (e) {
+                    console.error(`Error creating loop ${i+1}:`, e);
                     failed++;
                 }
             }
