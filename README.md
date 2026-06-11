@@ -1,10 +1,20 @@
-# LoopTrade
+# 🔄 LoopTrade
 
-Automated Bitcoin grid trading bot for LN Markets. LoopTrade places limit orders at strategic price levels and automatically sets take-profits, creating a hands-off trading strategy that works while you sleep.
+> Automated Bitcoin grid trading bot for LN Markets
 
-![LoopTrade](https://img.shields.io/badge/Bitcoin-Loop%20Trading-orange)
-![Python](https://img.shields.io/badge/Python-3.12%2B-blue)
-![LN Markets](https://img.shields.io/badge/LN%20Markets-Integrated-green)
+LoopTrade places limit orders at strategic price levels and automatically sets take-profits, creating a hands-off trading strategy that works while you sleep.
+
+[![Bitcoin](https://img.shields.io/badge/Bitcoin-Loop%20Trading-F7931A?style=for-the-badge&logo=bitcoin&logoColor=white)](https://bitcoin.org)
+[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![LN Markets](https://img.shields.io/badge/LN%20Markets-Integrated-792EE5?style=for-the-badge)](https://lnmarkets.com)
+
+## 🎯 What is LoopTrade?
+
+LoopTrade implements a **grid trading strategy** on LN Markets:
+- Place limit buy orders below market price
+- Automatically set take-profit sell orders
+- When trades complete, the loop restarts automatically
+- Profit from Bitcoin's natural volatility without constant monitoring
 
 ## Features
 
