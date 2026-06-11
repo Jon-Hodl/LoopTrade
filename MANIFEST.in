@@ -1,5 +1,0 @@
-include README.md
-include LICENSE
-include looptrade_config.template.json
-recursive-include templates *.html
-recursive-include scripts *

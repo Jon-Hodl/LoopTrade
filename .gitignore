@@ -1,8 +1,11 @@
-# Personal Config (contains API keys)
+# Configuration (contains API keys)
 looptrade_config.json
 looptrade_logs.json
 looptrade_state.json
+
+# Logs
 *.log
+logs/
 
 # Python
 __pycache__/
@@ -10,6 +13,11 @@ __pycache__/
 *$py.class
 *.so
 .Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
 venv/
 env/
 ENV/
@@ -30,8 +38,6 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
-# Build artifacts
-dist/
-build/
-*.egg-info/
-*.log
+# Temporary files
+*.tmp
+*.bak
