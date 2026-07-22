@@ -792,6 +792,28 @@ def update_settings():
     save_config(config)
     return jsonify({'success': True})
 
+@app.route('/api/settings/keys', methods=['DELETE'])
+def delete_api_keys():
+    """Delete API keys from config"""
+    config = load_config()
+    
+    # Stop bot if running
+    global bot_running
+    if bot_running:
+        bot_running = False
+        save_state({"should_be_running": False})
+        add_log("Bot stopped - API keys deleted")
+    
+    # Clear API keys
+    config['api_key'] = ''
+    config['api_secret'] = ''
+    config['api_passphrase'] = ''
+    
+    save_config(config)
+    add_log("API keys deleted from configuration")
+    
+    return jsonify({'success': True, 'message': 'API keys deleted successfully'})
+
 @app.route('/api/start', methods=['POST'])
 def start_bot():
     """Start the bot"""

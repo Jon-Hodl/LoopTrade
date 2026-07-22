@@ -1310,7 +1310,7 @@
     <!-- Settings Tab -->
     <div id="settings" class="tab-content">
         <div class="card">
-            <h2>API Configuration</h2>
+            <h2>API Configuration <span id="apiStatusBadge" style="font-size: 12px; padding: 4px 12px; border-radius: 20px; margin-left: 10px; font-weight: 500; text-transform: uppercase;">Checking...</span></h2>
             <div class="form-group">
                 <label>API Key</label>
                 <input type="password" id="apiKey" placeholder="Enter LNMarkets API Key">
@@ -1334,6 +1334,7 @@
                 </div>
             </div>
             <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+            <button class="btn btn-danger" onclick="deleteApiKeys()" style="margin-left: 10px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">🗑️ Delete API Keys</button>
         </div>
     </div>
 
@@ -1889,6 +1890,44 @@
                 location.reload();
             } else {
                 alert('Failed to save settings');
+            }
+        }
+
+        async function deleteApiKeys() {
+            if (!confirm('⚠️ WARNING\n\nThis will permanently delete your API keys from LoopTrade.\n\nThe bot will be stopped and you\'ll need to re-enter valid keys to trade again.\n\nContinue?')) {
+                return;
+            }
+
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '🗑️ Deleting...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/settings/keys', {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'}
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    alert('✅ API keys deleted successfully.\n\nThe bot has been stopped. Please enter new API keys to resume trading.');
+                    // Clear the input fields
+                    document.getElementById('apiKey').value = '';
+                    document.getElementById('apiSecret').value = '';
+                    document.getElementById('passphrase').value = '';
+                    location.reload();
+                } else {
+                    alert('❌ Failed to delete API keys: ' + (data.error || 'Unknown error'));
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                console.error('Delete API keys error:', e);
+                alert('❌ Error deleting API keys. Check console.');
+                btn.textContent = originalText;
+                btn.disabled = false;
             }
         }
 
@@ -2462,8 +2501,40 @@
         updateSentiment();
         updateVolatility();
         initBotToggle();
+        checkApiStatus();
         setInterval(updateSentiment, 300000);
         setInterval(updateVolatility, 300000);
+
+        // Check API key status for settings tab
+        async function checkApiStatus() {
+            try {
+                const response = await fetch('/api/settings');
+                const data = await response.json();
+                
+                const badge = document.getElementById('apiStatusBadge');
+                if (!badge) return;
+                
+                if (data.api_key_configured) {
+                    badge.textContent = '✓ Keys Configured';
+                    badge.style.background = 'rgba(34, 197, 94, 0.2)';
+                    badge.style.color = '#22c55e';
+                    badge.style.border = '1px solid rgba(34, 197, 94, 0.3)';
+                } else {
+                    badge.textContent = '✗ No Keys';
+                    badge.style.background = 'rgba(239, 68, 68, 0.2)';
+                    badge.style.color = '#ef4444';
+                    badge.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                }
+            } catch (e) {
+                console.log('Could not check API status:', e);
+                const badge = document.getElementById('apiStatusBadge');
+                if (badge) {
+                    badge.textContent = 'Unknown';
+                    badge.style.background = 'rgba(107, 114, 128, 0.2)';
+                    badge.style.color = '#6b7280';
+                }
+            }
+        }
         
         // Fetch and display market trend
         async function updateTrend() {
