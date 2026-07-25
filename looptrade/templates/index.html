@@ -541,7 +541,7 @@
                 
                 <!-- Toggle Container with ON/OFF labels -->
                 <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 4px; border-radius: 24px;">
-                    <!-- ON Label -->
+                    <!-- ON Label - LEFT SIDE -->
                     <span id="mirrorOnLabel" style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 12px; transition: all 0.3s; color: rgba(255,255,255,0.3);">On</span>
                     
                     <!-- Toggle Switch -->
@@ -552,7 +552,7 @@
                         </span>
                     </label>
                     
-                    <!-- OFF Label -->
+                    <!-- OFF Label - RIGHT SIDE -->
                     <span id="mirrorOffLabel" style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 12px; transition: all 0.3s; color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.05);">Off</span>
                 </div>
             </div>
@@ -600,12 +600,16 @@
             box-shadow: 0 0 20px rgba(34,197,94,0.5), 0 0 40px rgba(34,197,94,0.2), inset 0 1px 0 rgba(255,255,255,0.2);
         }
         #mirrorToggle:not(:checked) ~ #mirrorToggleTrack #mirrorToggleKnob {
-            /* Knob stays on left (no transform) when ON */
-            background: linear-gradient(145deg, #fff 0%, #dcfce7 100%);
-            box-shadow: 0 0 12px rgba(34,197,94,0.8), 0 2px 6px rgba(0,0,0,0.3);
+            /* Knob stays on left (no transform) when ON - GREEN KNOB */
+            background: linear-gradient(145deg, #4ade80 0%, #22c55e 100%);
+            box-shadow: 0 0 16px rgba(34,197,94,1), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+            border: 2px solid #16a34a;
         }
         #mirrorToggle:checked ~ #mirrorToggleTrack #mirrorToggleKnob {
             transform: translateX(24px);
+            background: linear-gradient(145deg, #fff 0%, #e5e5e5 100%);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.2);
+            border: none;
         }
         #mirrorToggle:disabled ~ #mirrorToggleTrack {
             opacity: 0.5;
