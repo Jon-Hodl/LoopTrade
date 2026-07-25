@@ -504,28 +504,57 @@
     
     <!-- Bot Status Toggle - Top Right -->
     <div style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
-        <div id="botStatusCard" style="display: flex; align-items: center; gap: 12px; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); padding: 12px 18px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); transition: all 0.3s ease;">
-            <!-- Bot Icon & Label -->
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 20px; filter: drop-shadow(0 0 8px rgba(249,115,22,0)); transition: all 0.3s;" id="botStatusIcon">🤖</span>
-                <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Bot Status</span>
+        <div id="botStatusCard" style="display: flex; flex-direction: column; gap: 12px; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); padding: 12px 18px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); transition: all 0.3s ease;">
+            <!-- Bot Toggle Row -->
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <!-- Bot Icon & Label -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 20px; filter: drop-shadow(0 0 8px rgba(249,115,22,0)); transition: all 0.3s;" id="botStatusIcon">🤖</span>
+                    <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Bot Status</span>
+                </div>
+                
+                <!-- Toggle Container with ON/OFF labels -->
+                <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 4px; border-radius: 24px;">
+                    <!-- ON Label -->
+                    <span id="onLabel" style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 12px; transition: all 0.3s; color: rgba(255,255,255,0.3);">On</span>
+                    
+                    <!-- Toggle Switch -->
+                    <label style="position: relative; display: inline-block; width: 52px; height: 28px; cursor: pointer;">
+                        <input type="checkbox" id="botToggle" style="opacity: 0; width: 0; height: 0;" onchange="toggleBotFromSwitch()">
+                        <span id="toggleTrack" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; transition: all 0.3s ease; border-radius: 28px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);">
+                            <span id="toggleKnob" style="position: absolute; height: 22px; width: 22px; left: 3px; bottom: 3px; background: linear-gradient(145deg, #fff 0%, #e5e5e5 100%); transition: all 0.3s ease; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.2);"></span>
+                        </span>
+                    </label>
+                    
+                    <!-- OFF Label -->
+                    <span id="offLabel" style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 12px; transition: all 0.3s; color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.05);">Off</span>
+                </div>
             </div>
             
-            <!-- Toggle Container with ON/OFF labels -->
-            <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 4px; border-radius: 24px;">
-                <!-- ON Label -->
-                <span id="onLabel" style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 12px; transition: all 0.3s; color: rgba(255,255,255,0.3);">On</span>
+            <!-- Mirror Toggle Row -->
+            <div style="display: flex; align-items: center; gap: 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+                <!-- Mirror Icon & Label -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px; transition: all 0.3s;" id="mirrorStatusIcon">🪞</span>
+                    <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Auto Mirror</span>
+                </div>
                 
-                <!-- Toggle Switch -->
-                <label style="position: relative; display: inline-block; width: 52px; height: 28px; cursor: pointer;">
-                    <input type="checkbox" id="botToggle" style="opacity: 0; width: 0; height: 0;" onchange="toggleBotFromSwitch()">
-                    <span id="toggleTrack" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; transition: all 0.3s ease; border-radius: 28px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);">
-                        <span id="toggleKnob" style="position: absolute; height: 22px; width: 22px; left: 3px; bottom: 3px; background: linear-gradient(145deg, #fff 0%, #e5e5e5 100%); transition: all 0.3s ease; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.2);"></span>
-                    </span>
-                </label>
-                
-                <!-- OFF Label -->
-                <span id="offLabel" style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 12px; transition: all 0.3s; color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.05);">Off</span>
+                <!-- Toggle Container with ON/OFF labels -->
+                <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 4px; border-radius: 24px;">
+                    <!-- ON Label -->
+                    <span id="mirrorOnLabel" style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 12px; transition: all 0.3s; color: rgba(255,255,255,0.3);">On</span>
+                    
+                    <!-- Toggle Switch -->
+                    <label style="position: relative; display: inline-block; width: 52px; height: 28px; cursor: pointer;">
+                        <input type="checkbox" id="mirrorToggle" style="opacity: 0; width: 0; height: 0;" onchange="toggleMirrorFromSwitch()">
+                        <span id="mirrorToggleTrack" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; transition: all 0.3s ease; border-radius: 28px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); background: #374151;">
+                            <span id="mirrorToggleKnob" style="position: absolute; height: 22px; width: 22px; left: 3px; bottom: 3px; background: linear-gradient(145deg, #fff 0%, #e5e5e5 100%); transition: all 0.3s ease; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.2);"></span>
+                        </span>
+                    </label>
+                    
+                    <!-- OFF Label -->
+                    <span id="mirrorOffLabel" style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 12px; transition: all 0.3s; color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.05);">Off</span>
+                </div>
             </div>
         </div>
     </div>
@@ -561,6 +590,33 @@
             animation: botPulse 2s ease-in-out infinite;
         }
         @keyframes botPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* Mirror Toggle - Green theme */
+        #mirrorToggle:not(:checked) ~ #mirrorToggleTrack {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            box-shadow: 0 0 20px rgba(34,197,94,0.5), 0 0 40px rgba(34,197,94,0.2), inset 0 1px 0 rgba(255,255,255,0.2);
+        }
+        #mirrorToggle:not(:checked) ~ #mirrorToggleTrack #mirrorToggleKnob {
+            /* Knob stays on left (no transform) when ON */
+            background: linear-gradient(145deg, #fff 0%, #dcfce7 100%);
+            box-shadow: 0 0 12px rgba(34,197,94,0.8), 0 2px 6px rgba(0,0,0,0.3);
+        }
+        #mirrorToggle:checked ~ #mirrorToggleTrack #mirrorToggleKnob {
+            transform: translateX(24px);
+        }
+        #mirrorToggle:disabled ~ #mirrorToggleTrack {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        /* Mirror active state */
+        .mirror-active #mirrorStatusIcon {
+            filter: drop-shadow(0 0 10px rgba(34,197,94,0.8)) !important;
+            animation: mirrorPulse 2s ease-in-out infinite;
+        }
+        @keyframes mirrorPulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.05); }
         }
@@ -2105,6 +2161,93 @@
             }
         }
 
+        // Toggle mirror from the top-right switch
+        async function toggleMirrorFromSwitch() {
+            const toggle = document.getElementById('mirrorToggle');
+            const onLabel = document.getElementById('mirrorOnLabel');
+            const offLabel = document.getElementById('mirrorOffLabel');
+            const card = document.getElementById('botStatusCard');
+
+            // Disable toggle during operation
+            toggle.disabled = true;
+
+            // Show loading state
+            onLabel.textContent = '...';
+            offLabel.textContent = '...';
+
+            // Inverted logic: unchecked = ON (enable), checked = OFF (disable)
+            const wantToEnable = !toggle.checked;
+
+            try {
+                const response = await fetch('/api/settings/mirror', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({enabled: wantToEnable})
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    updateMirrorToggle(wantToEnable);
+                    console.log('Auto mirror ' + (wantToEnable ? 'enabled' : 'disabled'));
+                } else {
+                    alert(data.error || 'Failed to update mirror setting');
+                    updateMirrorToggle(!wantToEnable);
+                }
+            } catch (e) {
+                console.error('Mirror toggle error:', e);
+                alert('Error updating mirror setting. Please try again.');
+                updateMirrorToggle(!wantToEnable);
+            } finally {
+                toggle.disabled = false;
+            }
+        }
+
+        // Update mirror toggle visual state
+        function updateMirrorToggle(isEnabled) {
+            const toggle = document.getElementById('mirrorToggle');
+            const onLabel = document.getElementById('mirrorOnLabel');
+            const offLabel = document.getElementById('mirrorOffLabel');
+            const card = document.getElementById('botStatusCard');
+
+            // Inverted: unchecked = ON (knob left, green), checked = OFF (knob right, gray)
+            toggle.checked = !isEnabled;
+
+            if (isEnabled) {
+                // Active state - Green glow, knob on LEFT (unchecked)
+                onLabel.style.color = '#fff';
+                onLabel.style.background = 'rgba(34,197,94,0.9)';
+                onLabel.style.boxShadow = '0 0 12px rgba(34,197,94,0.5)';
+                offLabel.style.color = 'rgba(255,255,255,0.3)';
+                offLabel.style.background = 'transparent';
+                offLabel.style.boxShadow = 'none';
+                card.classList.add('mirror-active');
+            } else {
+                // Inactive state - Boring/gray, knob on RIGHT (checked)
+                onLabel.style.color = 'rgba(255,255,255,0.3)';
+                onLabel.style.background = 'transparent';
+                onLabel.style.boxShadow = 'none';
+                offLabel.style.color = 'rgba(255,255,255,0.5)';
+                offLabel.style.background = 'rgba(255,255,255,0.05)';
+                offLabel.style.boxShadow = 'none';
+                card.classList.remove('mirror-active');
+            }
+        }
+
+        // Initialize mirror toggle state on page load
+        async function initMirrorToggle() {
+            try {
+                const response = await fetch('/api/settings');
+                const data = await response.json();
+                // Default to false if not set
+                const mirrorEnabled = data.auto_mirror === true;
+                updateMirrorToggle(mirrorEnabled);
+            } catch (e) {
+                console.error('Failed to get mirror status:', e);
+                updateMirrorToggle(false);
+            }
+        }
+
         async function clearAllLoops() {
             if (!confirm('Delete ALL loops? This cannot be undone.')) return;
             
@@ -2501,6 +2644,7 @@
         updateSentiment();
         updateVolatility();
         initBotToggle();
+        initMirrorToggle();
         checkApiStatus();
         setInterval(updateSentiment, 300000);
         setInterval(updateVolatility, 300000);

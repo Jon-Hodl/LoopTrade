@@ -769,7 +769,8 @@ def get_settings():
         'api_key_configured': bool(config.get('api_key')),
         'leverage': config.get('leverage', 1),
         'check_seconds': config.get('check_seconds', 30),
-        'loop_count': len(config.get('loops', []))
+        'loop_count': len(config.get('loops', [])),
+        'auto_mirror': config.get('auto_mirror', False)
     })
 
 @app.route('/api/settings', methods=['POST'])
@@ -813,6 +814,20 @@ def delete_api_keys():
     add_log("API keys deleted from configuration")
     
     return jsonify({'success': True, 'message': 'API keys deleted successfully'})
+
+@app.route('/api/settings/mirror', methods=['POST'])
+def update_mirror_setting():
+    """Update auto mirror setting"""
+    data = request.json
+    config = load_config()
+    
+    if 'enabled' in data:
+        config['auto_mirror'] = bool(data['enabled'])
+        save_config(config)
+        add_log(f"Auto mirror {'enabled' if config['auto_mirror'] else 'disabled'}")
+        return jsonify({'success': True, 'auto_mirror': config['auto_mirror']})
+    
+    return jsonify({'success': False, 'error': 'Missing enabled parameter'})
 
 @app.route('/api/start', methods=['POST'])
 def start_bot():
