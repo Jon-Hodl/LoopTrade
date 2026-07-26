@@ -3226,17 +3226,22 @@
                 const length = Math.sqrt(dx * dx + dy * dy);
                 const angle = Math.atan2(dy, dx) * (180 / Math.PI);
                 
+                // Format price with one decimal (e.g., 66500 -> 66.5k)
+                const formatPrice = (price) => {
+                    return (price / 1000).toFixed(1) + 'k';
+                };
+                
                 html += `
                     <!-- Line from entry to exit -->
                     <div style="position: absolute; left: ${x1}px; top: ${entryY}px; width: ${length}px; height: 2px; background: ${color}; transform-origin: 0 50%; transform: rotate(${angle}deg); opacity: 0.8; cursor: pointer;" onclick="document.getElementById('${loop.id}').scrollIntoView({behavior: 'smooth'})" title="${loop.direction === 'long' ? 'Buy' : 'Sell'} $${entryPrice.toLocaleString()} → ${loop.direction === 'long' ? 'Sell' : 'Buy'} $${exitPrice.toLocaleString()}"></div>
                     
                     <!-- Entry point (left) -->
                     <div style="position: absolute; left: ${x1 - 4}px; top: ${entryY - 4}px; width: 8px; height: 8px; background: ${color}; border-radius: 50%; border: 2px solid #fff; cursor: pointer;" onclick="document.getElementById('${loop.id}').scrollIntoView({behavior: 'smooth'})"></div>
-                    <div style="position: absolute; left: ${x1 - 35}px; top: ${entryY - 6}px; font-size: 9px; color: ${color}; text-align: right; width: 30px;">$${Math.round(entryPrice / 1000)}k</div>
+                    <div style="position: absolute; left: ${x1 - 40}px; top: ${entryY - 6}px; font-size: 9px; color: ${color}; text-align: right; width: 35px;">$${formatPrice(entryPrice)}</div>
                     
                     <!-- Exit point (right) -->
                     <div style="position: absolute; left: ${x2 - 4}px; top: ${exitY - 4}px; width: 8px; height: 8px; background: ${color}; border-radius: 50%; border: 2px solid #fff; cursor: pointer;" onclick="document.getElementById('${loop.id}').scrollIntoView({behavior: 'smooth'})"></div>
-                    <div style="position: absolute; left: ${x2 + 8}px; top: ${exitY - 6}px; font-size: 9px; color: ${color};">$${Math.round(exitPrice / 1000)}k</div>
+                    <div style="position: absolute; left: ${x2 + 8}px; top: ${exitY - 6}px; font-size: 9px; color: ${color};">$${formatPrice(exitPrice)}</div>
                 `;
             });
             
