@@ -1085,6 +1085,27 @@
                 </div>
             </div>
             
+            <!-- Loop Visualizer -->
+            <div id="loopVisualizer" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; margin-bottom: 20px; display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h3 style="margin: 0; font-size: 14px; color: var(--text-secondary);">📊 Grid Visualization</h3>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <div style="width: 12px; height: 12px; background: #22c55e; border-radius: 2px;"></div>
+                            <span style="font-size: 11px; color: var(--text-muted);">Long</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 2px;"></div>
+                            <span style="font-size: 11px; color: var(--text-muted);">Short</span>
+                        </div>
+                        <div id="vizCurrentPrice" style="font-size: 14px; font-weight: 700; color: #8b5cf6;">--</div>
+                    </div>
+                </div>
+                <div id="vizCanvas" style="position: relative; height: 200px; overflow-y: auto; overflow-x: hidden; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 8px;">
+                    <!-- Loops will be rendered here -->
+                </div>
+            </div>
+            
             <div id="loopsContainer">
                 {% if loops %}
                     {% for item in loops %}
@@ -1454,6 +1475,11 @@
                 updateSentiment();
                 updateTrend();
                 updateVolatility();
+            }
+            
+            // Render loop visualizer when loops tab is shown
+            if (tabName === 'loops') {
+                setTimeout(renderLoopVisualizer, 100);
             }
         }
 
@@ -3109,6 +3135,73 @@
                 }
             } catch (e) {
                 console.log('Could not fetch halving cycle:', e);
+            }
+        }
+        
+        // Render loop visualization
+        function renderLoopVisualizer() {
+            const container = document.getElementById('vizCanvas');
+            const loops = Array.from(document.querySelectorAll('.loop-item'));
+            
+            if (loops.length === 0) {
+                document.getElementById('loopVisualizer').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('loopVisualizer').style.display = 'block';
+            
+            // Get all prices to determine scale
+            let minPrice = Infinity;
+            let maxPrice = 0;
+            const loopData = loops.map(loop => {
+                const buy = parseFloat(loop.dataset.buyPrice);
+                const sell = parseFloat(loop.dataset.sellPrice);
+                const direction = loop.classList.contains('short') ? 'short' : 'long';
+                minPrice = Math.min(minPrice, buy, sell);
+                maxPrice = Math.max(maxPrice, buy, sell);
+                return { buy, sell, direction, id: loop.id };
+            });
+            
+            // Add padding to scale
+            const priceRange = maxPrice - minPrice;
+            minPrice -= priceRange * 0.1;
+            maxPrice += priceRange * 0.1;
+            const totalRange = maxPrice - minPrice;
+            
+            // Sort by price (highest first so top of chart = higher price)
+            loopData.sort((a, b) => Math.max(b.buy, b.sell) - Math.max(a.buy, a.sell));
+            
+            // Generate HTML
+            const barHeight = Math.max(20, Math.min(40, 180 / loopData.length));
+            let html = '';
+            
+            loopData.forEach((loop, index) => {
+                const lowPrice = Math.min(loop.buy, loop.sell);
+                const highPrice = Math.max(loop.buy, loop.sell);
+                const bottomPct = ((lowPrice - minPrice) / totalRange) * 100;
+                const heightPct = ((highPrice - lowPrice) / totalRange) * 100;
+                const color = loop.direction === 'long' ? '#22c55e' : '#ef4444';
+                
+                html += `
+                    <div style="position: absolute; left: 80px; right: 16px; bottom: ${bottomPct}%; height: ${Math.max(heightPct, 3)}%; background: ${color}40; border: 1px solid ${color}; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; cursor: pointer;" onclick="document.getElementById('${loop.id}').scrollIntoView({behavior: 'smooth'})" title="${loop.direction === 'long' ? 'Buy' : 'Sell'} $${loop.buy.toLocaleString()} → ${loop.direction === 'long' ? 'Sell' : 'Buy'} $${loop.sell.toLocaleString()}">
+                        <span style="text-shadow: 0 1px 2px rgba(0,0,0,0.8);">$${Math.round((loop.buy + loop.sell) / 2).toLocaleString()}</span>
+                    </div>
+                `;
+            });
+            
+            // Add price labels on left
+            for (let i = 0; i <= 5; i++) {
+                const price = minPrice + (totalRange * (i / 5));
+                const bottomPct = (i / 5) * 100;
+                html += `<div style="position: absolute; left: 8px; bottom: ${bottomPct}%; transform: translateY(50%); font-size: 10px; color: var(--text-muted);">$${Math.round(price).toLocaleString()}</div>`;
+            }
+            
+            container.innerHTML = html;
+            
+            // Update current price display (if we have it from metrics)
+            const priceEl = document.getElementById('btcPrice');
+            if (priceEl && priceEl.textContent !== '$--') {
+                document.getElementById('vizCurrentPrice').textContent = priceEl.textContent;
             }
         }
         
