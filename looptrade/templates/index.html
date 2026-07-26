@@ -1082,9 +1082,6 @@
                     <button class="btn btn-primary" onclick="syncOrders()" style="padding: 6px 12px; font-size: 11px;" title="Sync with LN Markets">
                         🔄 Sync
                     </button>
-                    <button class="btn btn-primary" onclick="mirrorOrders()" style="padding: 6px 12px; font-size: 11px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);" title="Mirror LN Markets to match LoopTrade">
-                        🪞 Mirror
-                    </button>
                 </div>
             </div>
             
@@ -2173,43 +2170,57 @@
             }
         }
 
-        // Toggle mirror from the top-right switch
+        // Toggle mirror from the top-right switch - EXECUTES MIRROR OPERATION
         async function toggleMirrorFromSwitch() {
+            const toggle = document.getElementById('mirrorToggle');
+            
+            // Inverted logic: unchecked = ON, checked = OFF
+            const wantToEnable = !toggle.checked;
+            
+            if (wantToEnable) {
+                // Turning ON - show warning and execute mirror
+                if (!confirm('⚠️ MIRROR OPERATION\n\nThis will:\n✓ Cancel any LN Markets orders that don\'t match your loops\n✓ Place orders for any loops that don\'t have them\n\nResult: LN Markets will EXACTLY match your LoopTrade loops.\n\nContinue?')) {
+                    // User cancelled - reset toggle to OFF
+                    toggle.checked = true;
+                    return;
+                }
+                
+                // Execute mirror operation
+                await executeMirrorOperation();
+            } else {
+                // Turning OFF - just update state (no operation needed)
+                updateMirrorToggle(false);
+                console.log('Auto mirror disabled');
+            }
+        }
+        
+        // Execute the actual mirror operation
+        async function executeMirrorOperation() {
             const toggle = document.getElementById('mirrorToggle');
             const onLabel = document.getElementById('mirrorOnLabel');
             const offLabel = document.getElementById('mirrorOffLabel');
-            const card = document.getElementById('botStatusCard');
-
+            
             // Disable toggle during operation
             toggle.disabled = true;
-
-            // Show loading state
             onLabel.textContent = '...';
             offLabel.textContent = '...';
-
-            // Inverted logic: unchecked = ON (enable), checked = OFF (disable)
-            const wantToEnable = !toggle.checked;
-
+            
             try {
-                const response = await fetch('/api/settings/mirror', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({enabled: wantToEnable})
-                });
-
+                const response = await fetch('/api/mirror', {method: 'POST'});
                 const data = await response.json();
-
-                if (response.ok && data.success) {
-                    updateMirrorToggle(wantToEnable);
-                    console.log('Auto mirror ' + (wantToEnable ? 'enabled' : 'disabled'));
+                
+                if (data.success) {
+                    alert('Mirror operation started! This may take a minute. Check logs for progress.');
+                    updateMirrorToggle(true);
+                    console.log('Mirror operation executed successfully');
                 } else {
-                    alert(data.error || 'Failed to update mirror setting');
-                    updateMirrorToggle(!wantToEnable);
+                    alert(data.error || 'Mirror failed');
+                    updateMirrorToggle(false);
                 }
             } catch (e) {
-                console.error('Mirror toggle error:', e);
-                alert('Error updating mirror setting. Please try again.');
-                updateMirrorToggle(!wantToEnable);
+                console.error('Mirror error:', e);
+                alert('Error running mirror. Check console.');
+                updateMirrorToggle(false);
             } finally {
                 toggle.disabled = false;
             }
