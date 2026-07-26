@@ -1091,18 +1091,21 @@
                     <h3 style="margin: 0; font-size: 14px; color: var(--text-secondary);">📊 Grid Visualization <span id="vizCount" style="font-size: 11px; color: var(--text-muted);"></span></h3>
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <div style="display: flex; align-items: center; gap: 6px;">
-                            <div style="width: 12px; height: 12px; background: #22c55e; border-radius: 2px;"></div>
-                            <span style="font-size: 11px; color: var(--text-muted);">Long</span>
+                            <div style="width: 20px; height: 2px; background: #22c55e; transform: rotate(45deg);"></div>
+                            <span style="font-size: 11px; color: var(--text-muted);">Long (Buy→Sell)</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px;">
-                            <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 2px;"></div>
-                            <span style="font-size: 11px; color: var(--text-muted);">Short</span>
+                            <div style="width: 20px; height: 2px; background: #ef4444; transform: rotate(-45deg);"></div>
+                            <span style="font-size: 11px; color: var(--text-muted);">Short (Sell→Buy)</span>
                         </div>
-                        <div id="vizCurrentPrice" style="font-size: 14px; font-weight: 700; color: #8b5cf6;">--</div>
                     </div>
                 </div>
-                <div id="vizCanvas" style="position: relative; height: 120px; overflow-y: auto; overflow-x: hidden; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 8px;">
-                    <!-- Loops will be rendered here -->
+                <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-bottom: 4px; padding: 0 40px;">
+                    <span>Buy Price</span>
+                    <span>Sell Price</span>
+                </div>
+                <div id="vizCanvas" style="position: relative; height: 300px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 1px solid rgba(255,255,255,0.1); border-right: 1px solid rgba(255,255,255,0.1);">
+                    <!-- Loops will be rendered here as diagonal lines -->
                 </div>
                 <div id="vizExpandBtn" style="margin-top: 8px; text-align: center; display: none;">
                     <button onclick="toggleVizExpand()" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 16px; font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;">
@@ -3143,7 +3146,7 @@
             }
         }
         
-        // Render loop visualization - shows top 3 by default
+        // Render loop visualization - diagonal lines from buy (left) to sell (right)
         let vizExpanded = false;
         
         function renderLoopVisualizer() {
@@ -3159,7 +3162,7 @@
             
             document.getElementById('loopVisualizer').style.display = 'block';
             
-            // Get all prices to determine scale
+            // Get all prices
             let minPrice = Infinity;
             let maxPrice = 0;
             let loopData = loops.map(loop => {
@@ -3168,71 +3171,76 @@
                 const direction = loop.classList.contains('short') ? 'short' : 'long';
                 minPrice = Math.min(minPrice, buy, sell);
                 maxPrice = Math.max(maxPrice, buy, sell);
-                return { buy, sell, direction, id: loop.id, avg: (buy + sell) / 2 };
+                return { buy, sell, direction, id: loop.id };
             });
             
-            // Sort by price (highest first so top of chart = higher price)
-            loopData.sort((a, b) => Math.max(b.buy, b.sell) - Math.max(a.buy, a.sell));
-            
-            // Show expand button if more than 3 loops
-            if (loopData.length > 3) {
+            // Show expand button if more than 5 loops
+            if (loopData.length > 5) {
                 expandBtn.style.display = 'block';
-                countLabel.textContent = vizExpanded ? `(showing all ${loopData.length})` : `(showing top 3 of ${loopData.length})`;
+                countLabel.textContent = vizExpanded ? `(showing all ${loopData.length})` : `(showing 5 of ${loopData.length})`;
                 
-                // If not expanded, only take top 3
+                // If not expanded, sample 5 loops spread across price range
                 if (!vizExpanded) {
-                    loopData = loopData.slice(0, 3);
+                    loopData.sort((a, b) => a.buy - b.buy);
+                    const step = Math.floor(loopData.length / 5);
+                    loopData = [0, 1, 2, 3, 4].map(i => loopData[Math.min(i * step, loopData.length - 1)]);
                 }
             } else {
                 expandBtn.style.display = 'none';
                 countLabel.textContent = `(${loopData.length} loops)`;
             }
             
-            // Recalculate scale for displayed loops only
-            minPrice = Infinity;
-            maxPrice = 0;
-            loopData.forEach(loop => {
-                minPrice = Math.min(minPrice, loop.buy, loop.sell);
-                maxPrice = Math.max(maxPrice, loop.buy, loop.sell);
-            });
-            
-            // Add padding to scale
+            // Add padding to price scale
             const priceRange = maxPrice - minPrice;
-            minPrice -= priceRange * 0.1;
-            maxPrice += priceRange * 0.1;
+            minPrice -= priceRange * 0.05;
+            maxPrice += priceRange * 0.05;
             const totalRange = maxPrice - minPrice;
             
-            // Generate HTML
+            // Generate HTML - diagonal lines
             let html = '';
+            const containerHeight = 300;
             
             loopData.forEach((loop, index) => {
-                const lowPrice = Math.min(loop.buy, loop.sell);
-                const highPrice = Math.max(loop.buy, loop.sell);
-                const bottomPct = ((lowPrice - minPrice) / totalRange) * 100;
-                const heightPct = ((highPrice - lowPrice) / totalRange) * 100;
                 const color = loop.direction === 'long' ? '#22c55e' : '#ef4444';
+                const entryPrice = loop.direction === 'long' ? loop.buy : loop.sell; // Left side
+                const exitPrice = loop.direction === 'long' ? loop.sell : loop.buy;   // Right side
+                
+                // Calculate Y positions (inverted - higher price = lower Y value)
+                const entryY = containerHeight - ((entryPrice - minPrice) / totalRange * containerHeight);
+                const exitY = containerHeight - ((exitPrice - minPrice) / totalRange * containerHeight);
+                
+                // Line coordinates
+                const x1 = 40;  // Left side (buy for long, sell for short)
+                const x2 = container.offsetWidth - 40;  // Right side
+                
+                // Calculate line length and angle
+                const dx = x2 - x1;
+                const dy = exitY - entryY;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx) * (180 / Math.PI);
                 
                 html += `
-                    <div style="position: absolute; left: 80px; right: 16px; bottom: ${bottomPct}%; height: ${Math.max(heightPct, 8)}%; background: ${color}40; border: 1px solid ${color}; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; cursor: pointer;" onclick="document.getElementById('${loop.id}').scrollIntoView({behavior: 'smooth'})" title="${loop.direction === 'long' ? 'Buy' : 'Sell'} $${loop.buy.toLocaleString()} → ${loop.direction === 'long' ? 'Sell' : 'Buy'} $${loop.sell.toLocaleString()}">
-                        <span style="text-shadow: 0 1px 2px rgba(0,0,0,0.8);">$${Math.round(loop.avg).toLocaleString()}</span>
-                    </div>
+                    <!-- Line from entry to exit -->
+                    <div style="position: absolute; left: ${x1}px; top: ${entryY}px; width: ${length}px; height: 2px; background: ${color}; transform-origin: 0 50%; transform: rotate(${angle}deg); opacity: 0.8; cursor: pointer;" onclick="document.getElementById('${loop.id}').scrollIntoView({behavior: 'smooth'})" title="${loop.direction === 'long' ? 'Buy' : 'Sell'} $${entryPrice.toLocaleString()} → ${loop.direction === 'long' ? 'Sell' : 'Buy'} $${exitPrice.toLocaleString()}"></div>
+                    
+                    <!-- Entry point (left) -->
+                    <div style="position: absolute; left: ${x1 - 4}px; top: ${entryY - 4}px; width: 8px; height: 8px; background: ${color}; border-radius: 50%; border: 2px solid #fff; cursor: pointer;" onclick="document.getElementById('${loop.id}').scrollIntoView({behavior: 'smooth'})"></div>
+                    <div style="position: absolute; left: ${x1 - 35}px; top: ${entryY - 6}px; font-size: 9px; color: ${color}; text-align: right; width: 30px;">$${Math.round(entryPrice / 1000)}k</div>
+                    
+                    <!-- Exit point (right) -->
+                    <div style="position: absolute; left: ${x2 - 4}px; top: ${exitY - 4}px; width: 8px; height: 8px; background: ${color}; border-radius: 50%; border: 2px solid #fff; cursor: pointer;" onclick="document.getElementById('${loop.id}').scrollIntoView({behavior: 'smooth'})"></div>
+                    <div style="position: absolute; left: ${x2 + 8}px; top: ${exitY - 6}px; font-size: 9px; color: ${color};">$${Math.round(exitPrice / 1000)}k</div>
                 `;
             });
             
-            // Add price labels on left
-            for (let i = 0; i <= 4; i++) {
-                const price = minPrice + (totalRange * (i / 4));
-                const bottomPct = (i / 4) * 100;
-                html += `<div style="position: absolute; left: 8px; bottom: ${bottomPct}%; transform: translateY(50%); font-size: 10px; color: var(--text-muted);">$${Math.round(price).toLocaleString()}</div>`;
+            // Add price grid lines
+            for (let i = 0; i <= 5; i++) {
+                const price = minPrice + (totalRange * (i / 5));
+                const y = containerHeight - ((price - minPrice) / totalRange * containerHeight);
+                html += `<div style="position: absolute; left: 0; right: 0; top: ${y}px; height: 1px; background: rgba(255,255,255,0.05); pointer-events: none;"></div>`;
             }
             
             container.innerHTML = html;
-            
-            // Update current price display (if we have it from metrics)
-            const priceEl = document.getElementById('btcPrice');
-            if (priceEl && priceEl.textContent !== '$--') {
-                document.getElementById('vizCurrentPrice').textContent = priceEl.textContent;
-            }
         }
         
         // Toggle expand/collapse of visualizer
