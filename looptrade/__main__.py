@@ -711,6 +711,8 @@ def add_loop():
     if current_price:
         # For LONG orders: buy price must be BELOW current price
         if direction == 'long' and buy_price >= current_price:
+            error_msg = f'REJECTED: LONG order above spot price. Buy ${buy_price:,.0f} >= Spot ${current_price:,.0f}'
+            add_log(error_msg)
             return jsonify({
                 'success': False, 
                 'error': f'Cannot place LONG order above spot price. Buy price ${buy_price:,.0f} is above current BTC price ${current_price:,.0f}. Lower your buy price or wait for BTC to drop.'
@@ -718,6 +720,8 @@ def add_loop():
         
         # For SHORT orders: sell price must be ABOVE current price
         if direction == 'short' and sell_price <= current_price:
+            error_msg = f'REJECTED: SHORT order below spot price. Sell ${sell_price:,.0f} <= Spot ${current_price:,.0f}'
+            add_log(error_msg)
             return jsonify({
                 'success': False,
                 'error': f'Cannot place SHORT order below spot price. Sell price ${sell_price:,.0f} is below current BTC price ${current_price:,.0f}. Raise your sell price or wait for BTC to rise.'
