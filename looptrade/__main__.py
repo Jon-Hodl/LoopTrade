@@ -703,13 +703,32 @@ def add_loop():
     config = load_config()
     
     direction = data.get('direction', 'long')
+    buy_price = float(data['buy_price'])
+    sell_price = float(data['sell_price'])
+    
+    # Get current BTC price to validate order placement
+    current_price = get_current_btc_price()
+    if current_price:
+        # For LONG orders: buy price must be BELOW current price
+        if direction == 'long' and buy_price >= current_price:
+            return jsonify({
+                'success': False, 
+                'error': f'Cannot place LONG order above spot price. Buy price ${buy_price:,.0f} is above current BTC price ${current_price:,.0f}. Lower your buy price or wait for BTC to drop.'
+            }), 400
+        
+        # For SHORT orders: sell price must be ABOVE current price
+        if direction == 'short' and sell_price <= current_price:
+            return jsonify({
+                'success': False,
+                'error': f'Cannot place SHORT order below spot price. Sell price ${sell_price:,.0f} is below current BTC price ${current_price:,.0f}. Raise your sell price or wait for BTC to rise.'
+            }), 400
     
     new_loop = {
         'id': len(config['loops']) + 1,
         'name': data.get('name', f"Loop {len(config['loops']) + 1}"),
         'direction': direction,
-        'buy_price': float(data['buy_price']),
-        'sell_price': float(data['sell_price']),
+        'buy_price': buy_price,
+        'sell_price': sell_price,
         'quantity_usd': float(data['quantity_usd']),
         'leverage': int(data.get('leverage', 1)),
         'enabled': True
