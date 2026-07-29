@@ -129,10 +129,19 @@ def get_loops():
     config = load_config()
     return jsonify(config.get('loops', []))
 
+# Cache for CoinGecko price (30 seconds)
+_price_cache = {'price': None, 'timestamp': 0}
+
 def get_current_btc_price():
-    """Fetch current BTC price"""
+    """Fetch current BTC price with caching"""
     import urllib.request
     import ssl
+    import time
+    
+    # Return cached price if fresh (within 30 seconds)
+    now = time.time()
+    if _price_cache['price'] is not None and (now - _price_cache['timestamp']) < 30:
+        return _price_cache['price']
     
     try:
         ctx = ssl.create_default_context()
@@ -144,9 +153,13 @@ def get_current_btc_price():
         
         with urllib.request.urlopen(req, context=ctx, timeout=5) as response:
             data = json.loads(response.read().decode())
-            return data['bitcoin']['usd']
+            price = data['bitcoin']['usd']
+            _price_cache['price'] = price
+            _price_cache['timestamp'] = now
+            return price
     except:
-        return None
+        # Return cached price even if old, rather than None
+        return _price_cache['price']
 
 def fetch_advanced_market_data():
     """Fetch comprehensive market data for elite analysis"""
