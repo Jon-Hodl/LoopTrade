@@ -2894,48 +2894,85 @@ class Bot:
                             add_log(f"[{name}] Failed to cancel order without TP: {cancel_err}")
                 
                 else:
-                    # Check position status using shared cache (all loops share same data)
-                    open_trades_list, running_trades_list, closed_trades_list = await get_cached_positions(self.client)
-                    
-                    # Safely extract IDs with error handling
+                    # STEP 1: Check RUNNING positions (LN Markets "Running" tab)
+                    # These are filled positions - we never want duplicates here
+                    await _rate_limiter.wait()
                     try:
-                        open_orders = {p.id for p in open_trades_list if hasattr(p, 'id')}
-                    except Exception as e:
-                        print(f"[{name}] Warning: Error reading open orders: {e}")
-                        open_orders = set()
-                    
-                    try:
-                        running_positions = {p.id for p in running_trades_list if hasattr(p, 'id')}
+                        running_trades_list = await self.client.futures.isolated.get_running_trades()
+                        _rate_limiter.report_success()
                     except Exception as e:
                         print(f"[{name}] Warning: Error reading running positions: {e}")
-                        running_positions = set()
+                        running_trades_list = []
                     
+                    # Check if this loop already has a running position
+                    for pos in running_trades_list:
+                        try:
+                            if hasattr(pos, 'price') and abs(pos.price - entry_price) < 0.5:
+                                if pid is None or pos.id != pid:
+                                    print(f"[{name}] FOUND RUNNING: Position already active @ ${entry_price:,.0f}")
+                                    pid = pos.id
+                                    break
+                        except:
+                            pass
+                    
+                    # STEP 2: Check OPEN orders (LN Markets "Open" tab)
+                    # These are pending orders - no duplicates here either
+                    await _rate_limiter.wait()
                     try:
-                        closed_ids = {t.id for t in closed_trades_list if hasattr(t, 'id')}
+                        open_trades_list = await self.client.futures.isolated.get_open_trades()
+                        _rate_limiter.report_success()
+                    except Exception as e:
+                        print(f"[{name}] Warning: Error reading open orders: {e}")
+                        open_trades_list = []
+                    
+                    # Check if this loop already has an open order
+                    for order in open_trades_list:
+                        try:
+                            if hasattr(order, 'price') and abs(order.price - entry_price) < 0.5:
+                                if pid is None or order.id != pid:
+                                    print(f"[{name}] FOUND OPEN: Order already pending @ ${entry_price:,.0f}")
+                                    pid = order.id
+                                    break
+                        except:
+                            pass
+                    
+                    # STEP 3: Check CLOSED orders (LN Markets "Closed" tab)
+                    # Look for completed loops that need to be reopened
+                    await _rate_limiter.wait()
+                    try:
+                        closed_trades_list = await self.client.futures.isolated.get_closed_trades()
+                        _rate_limiter.report_success()
                     except Exception as e:
                         print(f"[{name}] Warning: Error reading closed trades: {e}")
-                        closed_ids = set()
+                        closed_trades_list = []
                     
-                    if pid in open_orders:
-                        # Entry order still pending, do nothing
-                        pass
-                    elif pid in running_positions:
-                        # Entry filled, position running with takeprofit set
-                        print(f"[{name}] {entry_label} filled! Position running, takeprofit @ ${exit_price:,.0f}")
-                    elif pid in closed_ids:
-                        # Position closed (takeprofit executed)
-                        loops_completed += 1
-                        print(f"[{name}] {exit_label} filled (takeprofit)! LOOP #{loops_completed} complete")
-                        # Remove from tracking so we can place new entry order
-                        unmark_price_placing(entry_price)
-                        pid = None  # Reset to place new entry order
-                        just_completed_loop = True  # Flag to skip price validation on next iteration
-                    else:
-                        # Order ID not found anywhere — may have been cancelled
-                        print(f"[{name}] Order {pid[:8]} not found, resetting...")
-                        unmark_price_placing(entry_price)
-                        pid = None
-                        just_completed_loop = False  # Don't skip validation on unexpected reset
+                    # Check if our position just closed (loop completed)
+                    if pid:
+                        position_closed = False
+                        for trade in closed_trades_list:
+                            try:
+                                if hasattr(trade, 'id') and trade.id == pid:
+                                    position_closed = True
+                                    loops_completed += 1
+                                    print(f"[{name}] LOOP COMPLETE: Position closed @ ${exit_price:,.0f} (Loop #{loops_completed})")
+                                    unmark_price_placing(entry_price)
+                                    pid = None
+                                    just_completed_loop = True
+                                    break
+                            except:
+                                pass
+                        
+                        if not position_closed:
+                            # Our position is still active (running or open)
+                            pass
+                    
+                    # If no pid after all checks, we need to place a new order
+                    if not pid:
+                        # Only place if not already tracking this price
+                        if is_price_being_placed(entry_price):
+                            print(f"[{name}] WAITING: Another loop is placing order at ${entry_price:,.0f}")
+                        else:
+                            print(f"[{name}] READY: No existing order found at ${entry_price:,.0f}, will place new order")
                 
                 await asyncio.sleep(CHECK_SECONDS)
             except Exception as e:
@@ -3018,10 +3055,15 @@ class Bot:
             try:
                 await asyncio.sleep(interval_minutes * 60)  # Wait for interval
                 
+                # CRITICAL: Only run rescan if auto_mirror is enabled
+                config = load_config()
+                if not config.get('auto_mirror', False):
+                    print("[RESCAN] Auto mirror is OFF. Skipping periodic rescan.")
+                    continue
+                
                 print(f"[RESCAN] Running periodic rescan to ensure all loops have orders...")
                 
                 # Get current state
-                config = load_config()
                 loops = config.get('loops', [])
                 enabled_loops = [l for l in loops if l.get('enabled', True)]
                 
