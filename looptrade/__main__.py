@@ -2797,7 +2797,9 @@ class Bot:
                     try:
                         resp = await self.client.futures.isolated.new_trade(params)
                         pid = resp.id if hasattr(resp, 'id') else str(resp)
-                        print(f"[{name}] Placed {entry_label}: ${qty} position @ ${price:,.0f} (market: ${current_price:,.0f}) with {leverage}x leverage")
+                        log_msg = f"[{name}] Placed {entry_label}: ${qty} position @ ${price:,.0f} (market: ${current_price:,.0f}) with {leverage}x leverage"
+                        print(log_msg)
+                        add_log(log_msg)  # Also add to UI-visible logs
                         _rate_limiter.report_success()
                     except Exception as order_error:
                         error_msg = str(order_error)
@@ -2805,21 +2807,31 @@ class Bot:
                         if '429' in error_msg or 'rate' in error_msg.lower():
                             _rate_limiter.report_error(is_rate_limit=True)
                             print(f"[{name}] RATE LIMIT: Too many requests, backing off...")
+                            add_log(f"[{name}] RATE LIMIT: Backing off for 30s")
                             unmark_price_placing(price)
                             await asyncio.sleep(30)  # Wait 30s after rate limit
                             continue
                         # Check for specific LN Markets error types
                         elif 'insufficient' in error_msg.lower() or 'balance' in error_msg.lower():
-                            print(f"[{name}] ERROR: Insufficient funds to place {entry_label} order @ ${price:,.0f}")
-                            print(f"[{name}] Need: ${qty:,.0f} margin, Error: {error_msg}")
+                            err = f"[{name}] ERROR: Insufficient funds to place {entry_label} order @ ${price:,.0f}"
+                            print(err)
+                            add_log(err)
                         elif 'margin' in error_msg.lower():
-                            print(f"[{name}] ERROR: Margin issue - {error_msg}")
+                            err = f"[{name}] ERROR: Margin issue - {error_msg}"
+                            print(err)
+                            add_log(err)
                         elif 'price' in error_msg.lower():
-                            print(f"[{name}] ERROR: Price invalid - {error_msg}")
+                            err = f"[{name}] ERROR: Price invalid - {error_msg}"
+                            print(err)
+                            add_log(err)
                         elif 'leverage' in error_msg.lower():
-                            print(f"[{name}] ERROR: Leverage issue - {error_msg}")
+                            err = f"[{name}] ERROR: Leverage issue - {error_msg}"
+                            print(err)
+                            add_log(err)
                         else:
-                            print(f"[{name}] ERROR placing order: {error_msg}")
+                            err = f"[{name}] ERROR placing order: {error_msg}"
+                            print(err)
+                            add_log(err)
                         # Remove from tracking and wait before retry
                         unmark_price_placing(price)
                         await asyncio.sleep(CHECK_SECONDS * 2)  # Wait longer after error
