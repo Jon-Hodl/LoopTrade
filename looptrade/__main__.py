@@ -2775,12 +2775,26 @@ class Bot:
                             continue
                         raise
                     
-                    # Check if order already exists
+                    # Check if order already exists (including running positions)
                     order_exists = False
                     for order in existing_orders:
                         if abs(order.price - price) < 0.5:  # Within $0.50
                             order_exists = True
                             break
+                    
+                    # Also check running positions - don't duplicate those either!
+                    if not order_exists:
+                        try:
+                            running_trades = await self.client.futures.isolated.get_running_trades()
+                            for pos in running_trades:
+                                if hasattr(pos, 'price') and abs(pos.price - price) < 0.5:
+                                    order_exists = True
+                                    dup_msg = f"[{name}] SKIPPED: Running position already exists at ${price:,.0f}"
+                                    print(dup_msg)
+                                    add_log(dup_msg)
+                                    break
+                        except Exception as e:
+                            print(f"[{name}] Warning: Could not check running positions: {e}")
                     
                     if order_exists:
                         print(f"[{name}] SKIPPED: Order already exists at ${price:,.0f}")
@@ -2842,17 +2856,42 @@ class Bot:
                     
                     # Set takeprofit immediately after order is placed (with rate limiting)
                     await _rate_limiter.wait()
-                    try:
-                        tp_params = UpdateTakeprofitParams(id=resp.id, value=float(exit_price))
-                        await self.client.futures.isolated.update_takeprofit(tp_params)
-                        print(f"[{name}] Takeprofit set @ ${exit_price:,.0f}")
-                        _rate_limiter.report_success()
-                    except Exception as tp_error:
-                        if '429' in str(tp_error):
-                            _rate_limiter.report_error(is_rate_limit=True)
-                            print(f"[{name}] RATE LIMIT: Could not set takeprofit due to rate limiting")
-                        else:
-                            print(f"[{name}] Warning: Could not set takeprofit: {tp_error}")
+                    tp_set = False
+                    tp_retries = 3
+                    for tp_attempt in range(tp_retries):
+                        try:
+                            tp_params = UpdateTakeprofitParams(id=resp.id, value=float(exit_price))
+                            await self.client.futures.isolated.update_takeprofit(tp_params)
+                            tp_msg = f"[{name}] Takeprofit set @ ${exit_price:,.0f}"
+                            print(tp_msg)
+                            add_log(tp_msg)
+                            _rate_limiter.report_success()
+                            tp_set = True
+                            break
+                        except Exception as tp_error:
+                            if '429' in str(tp_error):
+                                _rate_limiter.report_error(is_rate_limit=True)
+                                print(f"[{name}] RATE LIMIT: Could not set takeprofit (attempt {tp_attempt+1}/{tp_retries})")
+                                if tp_attempt < tp_retries - 1:
+                                    await asyncio.sleep(5 * (tp_attempt + 1))  # Backoff
+                                    continue
+                            else:
+                                err_msg = f"[{name}] Warning: Could not set takeprofit: {tp_error}"
+                                print(err_msg)
+                                add_log(err_msg)
+                                break
+                    
+                    if not tp_set:
+                        # Critical: takeprofit not set - cancel the order to prevent risk
+                        warn_msg = f"[{name}] CRITICAL: Order placed WITHOUT takeprofit! Cancelling for safety..."
+                        print(warn_msg)
+                        add_log(warn_msg)
+                        try:
+                            await self.client.futures.isolated.cancel_trade(resp.id)
+                            add_log(f"[{name}] Cancelled order without takeprofit")
+                            pid = None  # Reset so we can retry
+                        except Exception as cancel_err:
+                            add_log(f"[{name}] Failed to cancel order without TP: {cancel_err}")
                 
                 else:
                     # Check position status using shared cache (all loops share same data)
