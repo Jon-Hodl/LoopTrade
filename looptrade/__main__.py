@@ -3093,15 +3093,24 @@ class Bot:
     
     async def periodic_rescan(self, interval_minutes=5):
         """Periodically rescan and ensure all loops have orders placed"""
+        last_mirror_status = None  # Track status to avoid duplicate logs
         while True:
             try:
                 await asyncio.sleep(interval_minutes * 60)  # Wait for interval
                 
                 # CRITICAL: Only run rescan if auto_mirror is enabled
                 config = load_config()
-                if not config.get('auto_mirror', False):
-                    print("[RESCAN] Auto mirror is OFF. Skipping periodic rescan.")
+                current_status = config.get('auto_mirror', False)
+                
+                # Only log when status changes (not every interval)
+                if not current_status:
+                    if last_mirror_status is not False:
+                        print("[RESCAN] Auto mirror is OFF. Skipping periodic rescan.")
+                        add_log("[RESCAN] Auto mirror is OFF. Will check again in 5 minutes.")
+                    last_mirror_status = False
                     continue
+                
+                last_mirror_status = True  # Update status tracker
                 
                 print(f"[RESCAN] Running periodic rescan to ensure all loops have orders...")
                 
