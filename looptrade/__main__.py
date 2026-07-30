@@ -1341,7 +1341,10 @@ def get_market_sentiment():
 
 # Cache storage
 _cache = {}
-CACHE_DURATION = 600  # 10 minutes (increased from 5 min to reduce CoinGecko 429 errors)
+CACHE_DURATION = 3600  # 60 minutes (1 hour) - Metrics only need hourly updates
+
+# Separate cache for price (more frequent but still limited)
+_price_cache_duration = 60  # 1 minute for price only
 
 # Global CoinGecko rate limiter
 _last_coingecko_call = 0

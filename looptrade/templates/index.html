@@ -2476,14 +2476,14 @@
             }
         }
 
-        // Load sentiment on page load and refresh every 15 minutes (reduce CoinGecko rate limits)
+        // Load sentiment on page load and refresh HOURLY (reduce CoinGecko rate limits)
         updateSentiment();
         updateVolatility();
         initBotToggle();
         initMirrorToggle();
         checkApiStatus();
-        setInterval(updateSentiment, 900000);  // 15 min
-        setInterval(updateVolatility, 900000);  // 15 min
+        setInterval(updateSentiment, 3600000);  // 60 min (1 hour)
+        setInterval(updateVolatility, 3600000);  // 60 min (1 hour)
 
         // Check API key status for settings tab
         async function checkApiStatus() {
@@ -2560,9 +2560,9 @@
             }
         }
         
-        // Load trend on page load and refresh every 10 minutes (reduce CoinGecko rate limits)
+        // Load trend on page load and refresh HOURLY (reduce CoinGecko rate limits)
         updateTrend();
-        setInterval(updateTrend, 600000);  // 10 min
+        setInterval(updateTrend, 3600000);  // 60 min (1 hour)
 
         // Fetch and display liquidation heatmap
         async function updateLiquidations() {
@@ -2648,9 +2648,9 @@
             }
         }
 
-        // Load liquidation data on page load and refresh every 15 minutes (reduce CoinGecko rate limits)
+        // Load liquidation data on page load and refresh HOURLY (reduce CoinGecko rate limits)
         updateLiquidations();
-        setInterval(updateLiquidations, 900000);  // 15 min
+        setInterval(updateLiquidations, 3600000);  // 60 min (1 hour)
 
         // Fetch and display funding rates
         async function updateFunding() {
@@ -3084,12 +3084,10 @@
         updateExchangeFlows();
         updateHalvingCycle();
         
-        // Set refresh intervals - REDUCED to avoid CoinGecko rate limits (429 errors)
-        setInterval(updateOrderbook, 300000); // Every 5 minutes (was 30 seconds)
-        setInterval(updateFundingHeatmap, 600000); // Every 10 minutes (was 5 min)
-        setInterval(updatePerformance, 300000); // Every 5 minutes (was 1 min)
-        setInterval(updateExchangeFlows, 600000); // Every 10 minutes (was 5 min)
-        setInterval(updateHalvingCycle, 3600000); // Every hour
+        // Set refresh intervals - HOURLY for all CoinGecko-dependent features
+        // Only loop operations (LN Markets) need to be real-time
+        setInterval(updateOrderbook, 3600000); // Every 60 min (was 5 min)
+        setInterval(updateHalvingCycle, 3600000); // Every 60 min
 
         // Handle URL parameters for direction pre-selection
         window.addEventListener('DOMContentLoaded', function() {
