@@ -2585,8 +2585,27 @@ async def get_cached_positions(client):
         
         return (open_trades, running_trades, closed_trades)
 
+async def fetch_price_lnmarkets(client):
+    """Fetch BTC price from LN Markets (preferred over CoinGecko)"""
+    try:
+        # Try to get mark price from LN Markets
+        await _rate_limiter.wait()
+        ticker = await client.futures.get_ticker()
+        _rate_limiter.report_success()
+        
+        # LN Markets ticker returns mark price
+        if hasattr(ticker, 'mark_price'):
+            return float(ticker.mark_price)
+        elif hasattr(ticker, 'price'):
+            return float(ticker.price)
+        elif isinstance(ticker, dict):
+            return float(ticker.get('mark_price', ticker.get('price', 0)))
+    except Exception as e:
+        print(f"[PRICE] LN Markets price fetch failed: {e}")
+        raise  # Let caller handle fallback
+
 async def fetch_price_coingecko():
-    """Fetch BTC price from CoinGecko (more reliable than LN Markets)"""
+    """Fetch BTC price from CoinGecko (fallback only)"""
     import urllib.request
     import ssl
     
@@ -2602,25 +2621,36 @@ async def fetch_price_coingecko():
         return float(data['bitcoin']['usd'])
 
 async def get_cached_ticker(client):
-    """Get ticker price from CoinGecko (not LN Markets to avoid rate limits)"""
+    """Get ticker price from LN Markets first, fallback to CoinGecko"""
     global _ticker_cache
     now = time.time()
-    
+
     # Return cached price if fresh (within 60 seconds)
     if now - _ticker_cache['timestamp'] < 60 and _ticker_cache['price'] is not None:
         return _ticker_cache['price']
-    
+
     # Use lock to prevent multiple simultaneous fetches
     async with _ticker_cache['lock']:
         # Double-check after acquiring lock (another loop might have updated it)
         if now - _ticker_cache['timestamp'] < 60 and _ticker_cache['price'] is not None:
             return _ticker_cache['price']
-        
+
+        # Try LN Markets first
+        try:
+            price = await fetch_price_lnmarkets(client)
+            _ticker_cache['price'] = price
+            _ticker_cache['timestamp'] = time.time()
+            print(f"[PRICE] Updated BTC price from LN Markets: ${price:,.2f}")
+            return price
+        except Exception as e:
+            print(f"[PRICE] LN Markets failed, trying CoinGecko fallback...")
+
+        # Fallback to CoinGecko
         try:
             price = await fetch_price_coingecko()
             _ticker_cache['price'] = price
             _ticker_cache['timestamp'] = time.time()
-            print(f"[PRICE] Updated BTC price from CoinGecko: ${price:,.2f}")
+            print(f"[PRICE] Updated BTC price from CoinGecko (fallback): ${price:,.2f}")
             return price
         except Exception as e:
             print(f"[PRICE] CoinGecko error: {e}")
