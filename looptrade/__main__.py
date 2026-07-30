@@ -1341,7 +1341,37 @@ def get_market_sentiment():
 
 # Cache storage
 _cache = {}
-CACHE_DURATION = 300  # 5 minutes
+CACHE_DURATION = 600  # 10 minutes (increased from 5 min to reduce CoinGecko 429 errors)
+
+# Global CoinGecko rate limiter
+_last_coingecko_call = 0
+_coingecko_min_interval = 6  # Minimum seconds between CoinGecko calls (max 10/min)
+
+def rate_limited_coingecko_call(url, headers=None):
+    """Make rate-limited call to CoinGecko"""
+    global _last_coingecko_call
+    import time
+    
+    now = time.time()
+    time_since_last = now - _last_coingecko_call
+    
+    if time_since_last < _coingecko_min_interval:
+        sleep_time = _coingecko_min_interval - time_since_last
+        print(f"[RATE LIMIT] Waiting {sleep_time:.1f}s before next CoinGecko call...")
+        time.sleep(sleep_time)
+    
+    _last_coingecko_call = time.time()
+    
+    import urllib.request
+    import ssl
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    
+    req = urllib.request.Request(url, headers=headers or {'User-Agent': 'Mozilla/5.0'})
+    
+    with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
+        return json.loads(response.read().decode())
 
 def get_cached(key, fetch_func):
     """Get data from cache or fetch if expired"""
@@ -2697,6 +2727,9 @@ class Bot:
         pid = existing_pid  # Use existing PID if provided from sync
         loops_completed = 0
         
+        # Log task start for debugging duplicates
+        print(f"[TASK START] {name} - Task ID: {id(asyncio.current_task())}")
+        
         if pid:
             print(f"[{name}] Resuming with existing order: {pid[:8]}...")
         
@@ -3031,11 +3064,17 @@ class Bot:
                         # Skip if this loop was matched to an existing order during sync
                         # (another loop task is already tracking it)
                         if loop_id in existing_pids:
-                            print(f"Skipping loop '{loop.get('name')}' - already synced to existing order")
+                            print(f"[MAIN] Skipping loop '{loop.get('name')}' - already synced to existing order")
                             started_prices.add(unique_key)  # Mark as started so we don't try again
                             continue
                         
-                        print(f"Starting new loop: {loop.get('name', f'Loop {i}')} @ ${buy_price:,.0f}")
+                        # DEBUG: Check if task already exists
+                        if unique_key in active_loops:
+                            print(f"[MAIN] WARNING: Task already exists for {unique_key} but not in started_prices!")
+                            started_prices.add(unique_key)
+                            continue
+                        
+                        print(f"[MAIN] Starting new loop task: {loop.get('name', f'Loop {i}')} @ ${buy_price:,.0f} (key: {unique_key})")
                         # Pass existing PID if we found one during sync
                         existing_pid = existing_pids.get(loop_id)
                         task = asyncio.create_task(self.run_loop(loop, existing_pid))

@@ -2476,14 +2476,14 @@
             }
         }
 
-        // Load sentiment on page load and refresh every 10 minutes (reduce CoinGecko rate limits)
+        // Load sentiment on page load and refresh every 15 minutes (reduce CoinGecko rate limits)
         updateSentiment();
         updateVolatility();
         initBotToggle();
         initMirrorToggle();
         checkApiStatus();
-        setInterval(updateSentiment, 600000);  // 10 min
-        setInterval(updateVolatility, 600000);  // 10 min
+        setInterval(updateSentiment, 900000);  // 15 min
+        setInterval(updateVolatility, 900000);  // 15 min
 
         // Check API key status for settings tab
         async function checkApiStatus() {
@@ -2560,9 +2560,9 @@
             }
         }
         
-        // Load trend on page load and refresh every 5 minutes (reduce CoinGecko rate limits)
+        // Load trend on page load and refresh every 10 minutes (reduce CoinGecko rate limits)
         updateTrend();
-        setInterval(updateTrend, 300000);  // 5 min
+        setInterval(updateTrend, 600000);  // 10 min
 
         // Fetch and display liquidation heatmap
         async function updateLiquidations() {
@@ -2648,9 +2648,9 @@
             }
         }
 
-        // Load liquidation data on page load and refresh every 10 minutes (reduce CoinGecko rate limits)
+        // Load liquidation data on page load and refresh every 15 minutes (reduce CoinGecko rate limits)
         updateLiquidations();
-        setInterval(updateLiquidations, 600000);  // 10 min
+        setInterval(updateLiquidations, 900000);  // 15 min
 
         // Fetch and display funding rates
         async function updateFunding() {
