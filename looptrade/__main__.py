@@ -853,14 +853,14 @@ def delete_api_keys():
 
 @app.route('/api/settings/mirror', methods=['POST'])
 def update_mirror_setting():
-    """Update auto mirror setting"""
+    """Update auto loop setting"""
     data = request.json
     config = load_config()
     
     if 'enabled' in data:
         config['auto_mirror'] = bool(data['enabled'])
         save_config(config)
-        add_log(f"Auto mirror {'enabled' if config['auto_mirror'] else 'disabled'}")
+        add_log(f"Auto loop {'enabled' if config['auto_mirror'] else 'disabled'}")
         return jsonify({'success': True, 'auto_mirror': config['auto_mirror']})
     
     return jsonify({'success': False, 'error': 'Missing enabled parameter'})
@@ -957,7 +957,7 @@ def sync_orders():
 
 @app.route('/api/mirror', methods=['POST'])
 def mirror_orders():
-    """Full mirror: Ensure LN Markets exactly matches LoopTrade loops"""
+    """Full loop: Ensure LN Markets exactly matches LoopTrade loops"""
     global bot_running, bot_thread
     
     config = load_config()
@@ -971,7 +971,7 @@ def mirror_orders():
     # Stop bot to avoid conflicts
     if bot_running:
         bot_running = False
-        add_log("Stopping bot for full mirror operation...")
+        add_log("Stopping bot for full loop operation...")
         time.sleep(2)
     
     # Run mirror operation in background thread
@@ -1081,11 +1081,11 @@ async def mirror():
     cfg = APIClientConfig(authentication=auth, network="mainnet")
     
     async with LNMClient(cfg) as client:
-        add_log("[MIRROR] Starting full mirror operation...")
-        
+        add_log("[LOOP] Starting full loop operation...")
+
         # Get all loops from config
         loops = config.get('loops', [])
-        add_log(f"[MIRROR] Found {len(loops)} loops in LoopTrade")
+        add_log(f"[LOOP] Found {len(loops)} loops in LoopTrade")
         
         # Build map of loop entry prices to expected margin
         loop_data = {}  # price -> (qty, leverage, expected_margin)
@@ -1246,30 +1246,30 @@ asyncio.run(mirror())
             if result.returncode != 0:
                 add_log(f"[MIRROR] Error: {result.stderr[:500]}")
             elif result.stderr:
-                add_log(f"[MIRROR] stderr: {result.stderr[:200]}")
-                
+                add_log(f"[LOOP] stderr: {result.stderr[:200]}")
+
         except Exception as e:
-            add_log(f"[MIRROR] Error running mirror: {e}")
-    
-    # Start mirror in background
+            add_log(f"[LOOP] Error running loop: {e}")
+
+    # Start loop in background
     mirror_thread = threading.Thread(target=do_mirror, daemon=True)
     mirror_thread.start()
-    
-    add_log("Full mirror operation started - syncing LN Markets to match LoopTrade")
-    
-    # Restart bot after mirror completes
+
+    add_log("Full loop operation started - syncing LN Markets to match LoopTrade")
+
+    # Restart bot after loop completes
     def restart_after_mirror():
         mirror_thread.join()
         global bot_running, bot_thread
         bot_running = True
         bot_thread = threading.Thread(target=run_bot_thread, daemon=True)
         bot_thread.start()
-        add_log("Mirror complete - bot restarted")
+        add_log("Loop complete - bot restarted")
     
     restart_thread = threading.Thread(target=restart_after_mirror, daemon=True)
     restart_thread.start()
     
-    return jsonify({'success': True, 'message': 'Full mirror started - this may take a minute'})
+    return jsonify({'success': True, 'message': 'Full loop started - this may take a minute'})
 
 @app.route('/api/market/sentiment', methods=['GET'])
 def get_market_sentiment():
@@ -3135,13 +3135,13 @@ class Bot:
                 # Only log when status changes (not every interval)
                 if not current_status:
                     if last_mirror_status is not False:
-                        print("[RESCAN] Auto mirror is OFF. Skipping periodic rescan.")
-                        add_log("[RESCAN] Auto mirror is OFF. Will check again in 5 minutes.")
+                        print("[RESCAN] Auto loop is OFF. Skipping periodic rescan.")
+                        add_log("[RESCAN] Auto loop is OFF. Will check again in 5 minutes.")
                     last_mirror_status = False
                     continue
-                
+
                 last_mirror_status = True  # Update status tracker
-                
+
                 print(f"[RESCAN] Running periodic rescan to ensure all loops have orders...")
                 
                 # Get current state
@@ -3175,9 +3175,9 @@ class Bot:
                 
                 print(f"[RESCAN] Found {total_orders} orders on LN Markets, {expected_orders} enabled loops configured")
                 
-                # If counts don't match, trigger a mirror operation
+                # If counts don't match, trigger a loop operation
                 if total_orders != expected_orders:
-                    print(f"[RESCAN] MISMATCH: Have {total_orders}, need {expected_orders}. Running mirror...")
+                    print(f"[RESCAN] MISMATCH: Have {total_orders}, need {expected_orders}. Running loop...")
                     
                     # Find missing loops
                     for loop in enabled_loops:
@@ -3190,18 +3190,18 @@ class Bot:
                         if entry_price not in orders_by_price:
                             print(f"[RESCAN] Missing order for '{loop.get('name')}' @ ${entry_price:,.0f}")
                     
-                    # Trigger mirror to fix
-                    await self.run_mirror()
+                    # Trigger loop to fix
+                    await self.run_loop_sync()
                 else:
                     print(f"[RESCAN] All {expected_orders} loops have orders. No action needed.")
                     
             except Exception as e:
                 print(f"[RESCAN] Error during periodic rescan: {e}")
     
-    async def run_mirror(self):
-        """Run mirror operation to sync loops with LN Markets"""
+    async def run_loop_sync(self):
+        """Run loop operation to sync loops with LN Markets"""
         try:
-            print("[MIRROR] Starting mirror operation...")
+            print("[LOOP] Starting loop operation...")
             
             config = load_config()
             loops = config.get('loops', [])

@@ -531,12 +531,12 @@
                 </div>
             </div>
             
-            <!-- Mirror Toggle Row -->
+            <!-- Loop Toggle Row -->
             <div style="display: flex; align-items: center; gap: 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
-                <!-- Mirror Icon & Label -->
+                <!-- Loop Icon & Label -->
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 18px; transition: all 0.3s;" id="mirrorStatusIcon">🪞</span>
-                    <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Auto Mirror</span>
+                    <span style="font-size: 18px; transition: all 0.3s;" id="mirrorStatusIcon">🔄</span>
+                    <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Loop</span>
                 </div>
                 
                 <!-- Toggle Container with ON/OFF labels -->
@@ -546,7 +546,7 @@
                     
                     <!-- Toggle Switch -->
                     <label style="position: relative; display: inline-block; width: 52px; height: 28px; cursor: pointer;">
-                        <input type="checkbox" id="mirrorToggle" style="opacity: 0; width: 0; height: 0;" onchange="toggleMirrorFromSwitch()">
+                        <input type="checkbox" id="mirrorToggle" style="opacity: 0; width: 0; height: 0;" onchange="toggleLoopFromSwitch()">
                         <span id="mirrorToggleTrack" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; transition: all 0.3s ease; border-radius: 28px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); background: #374151;">
                             <span id="mirrorToggleKnob" style="position: absolute; height: 22px; width: 22px; left: 3px; bottom: 3px; background: linear-gradient(145deg, #fff 0%, #e5e5e5 100%); transition: all 0.3s ease; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.2);"></span>
                         </span>
@@ -628,7 +628,7 @@
         }
         
         /* Mirror active state - NO GLOW */
-        .mirror-active #mirrorStatusIcon {
+        .loop-active #mirrorStatusIcon {
             filter: none !important;
             animation: none !important;
         }
@@ -874,8 +874,8 @@
                     <button class="btn btn-secondary" id="spreadSortBtn" onclick="toggleSort('spread')" style="padding: 6px 12px; font-size: 11px;">
                         Spread ↕
                     </button>
-                    <button class="btn btn-primary" onclick="syncOrders()" style="padding: 6px 12px; font-size: 11px;" title="Sync with LN Markets">
-                        🔄 Sync
+                    <button class="btn btn-primary" onclick="syncOrders()" style="padding: 6px 12px; font-size: 11px;" title="Single Sync with LN Markets">
+                        🔄 Single Sync
                     </button>
                 </div>
             </div>
@@ -1807,9 +1807,9 @@
             location.reload();
         }
 
-        // Sync orders with LN Markets
+        // Single Sync - One-time sync with LN Markets
         async function syncOrders() {
-            if (!confirm('Sync loops with LN Markets? This will restart the bot and match existing orders.')) {
+            if (!confirm('Single Sync with LN Markets? This will restart the bot and match existing orders.')) {
                 return;
             }
             
@@ -1823,30 +1823,30 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('Sync triggered! Bot is restarting and will match existing orders.');
+                    alert('Single Sync triggered! Bot is restarting and will match existing orders.');
                     location.reload();
                 } else {
-                    alert(data.error || 'Sync failed');
+                    alert(data.error || 'Single Sync failed');
                     btn.textContent = originalText;
                     btn.disabled = false;
                 }
             } catch (e) {
-                console.error('Sync error:', e);
+                console.error('Single Sync error:', e);
                 alert('Error syncing orders. Check console.');
                 btn.textContent = originalText;
                 btn.disabled = false;
             }
         }
 
-        // Mirror LN Markets to match LoopTrade exactly
+        // Full Loop - Ensure LN Markets matches LoopTrade exactly
         async function mirrorOrders() {
-            if (!confirm('⚠️ MIRROR OPERATION\n\nThis will:\n✓ Cancel any LN Markets orders that don\'t match your loops\n✓ Place orders for any loops that don\'t have them\n\nResult: LN Markets will EXACTLY match your LoopTrade loops.\n\nContinue?')) {
+            if (!confirm('⚠️ LOOP OPERATION\n\nThis will:\n✓ Cancel any LN Markets orders that don\'t match your loops\n✓ Place orders for any loops that don\'t have them\n\nResult: LN Markets will EXACTLY match your LoopTrade loops.\n\nContinue?')) {
                 return;
             }
             
             const btn = event.target;
             const originalText = btn.textContent;
-            btn.textContent = '🪞 Mirroring...';
+            btn.textContent = '🔄 Looping...';
             btn.disabled = true;
             
             try {
@@ -1854,21 +1854,21 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('Mirror operation started! This may take a minute. Check logs for progress.');
+                    alert('Loop operation started! This may take a minute. Check logs for progress.');
                     // Don't reload - let user watch logs
-                    btn.textContent = '🪞 Running...';
+                    btn.textContent = '🔄 Running...';
                     setTimeout(() => {
                         btn.textContent = originalText;
                         btn.disabled = false;
                     }, 60000); // Re-enable after 1 minute
                 } else {
-                    alert(data.error || 'Mirror failed');
+                    alert(data.error || 'Loop failed');
                     btn.textContent = originalText;
                     btn.disabled = false;
                 }
             } catch (e) {
-                console.error('Mirror error:', e);
-                alert('Error running mirror. Check console.');
+                console.error('Loop error:', e);
+                alert('Error running loop. Check console.');
                 btn.textContent = originalText;
                 btn.disabled = false;
             }
@@ -1962,56 +1962,56 @@
             }
         }
 
-        // Toggle mirror from the top-right switch - EXECUTES MIRROR OPERATION
-        async function toggleMirrorFromSwitch() {
+        // Toggle loop from the top-right switch - EXECUTES LOOP OPERATION
+        async function toggleLoopFromSwitch() {
             const toggle = document.getElementById('mirrorToggle');
-            
+
             // Inverted logic: unchecked = ON, checked = OFF
             const wantToEnable = !toggle.checked;
-            
+
             if (wantToEnable) {
-                // Turning ON - show warning and execute mirror
-                if (!confirm('⚠️ MIRROR OPERATION\n\nThis will:\n✓ Cancel any LN Markets orders that don\'t match your loops\n✓ Place orders for any loops that don\'t have them\n\nResult: LN Markets will EXACTLY match your LoopTrade loops.\n\nContinue?')) {
+                // Turning ON - show warning and execute loop
+                if (!confirm('⚠️ LOOP OPERATION\n\nThis will:\n✓ Cancel any LN Markets orders that don\'t match your loops\n✓ Place orders for any loops that don\'t have them\n\nResult: LN Markets will EXACTLY match your LoopTrade loops.\n\nContinue?')) {
                     // User cancelled - reset toggle to OFF
                     toggle.checked = true;
                     return;
                 }
-                
-                // Execute mirror operation
-                await executeMirrorOperation();
+
+                // Execute loop operation
+                await executeLoopOperation();
             } else {
                 // Turning OFF - just update state (no operation needed)
                 updateMirrorToggle(false);
-                console.log('Auto mirror disabled');
+                console.log('Auto loop disabled');
             }
         }
-        
-        // Execute the actual mirror operation
-        async function executeMirrorOperation() {
+
+        // Execute the actual loop operation
+        async function executeLoopOperation() {
             const toggle = document.getElementById('mirrorToggle');
             const onLabel = document.getElementById('mirrorOnLabel');
             const offLabel = document.getElementById('mirrorOffLabel');
-            
+
             // Disable toggle during operation
             toggle.disabled = true;
             onLabel.textContent = '...';
             offLabel.textContent = '...';
-            
+
             try {
                 const response = await fetch('/api/mirror', {method: 'POST'});
                 const data = await response.json();
-                
+
                 if (data.success) {
-                    alert('Mirror operation started! This may take a minute. Check logs for progress.');
+                    alert('Loop operation started! This may take a minute. Check logs for progress.');
                     updateMirrorToggle(true);
-                    console.log('Mirror operation executed successfully');
+                    console.log('Loop operation executed successfully');
                 } else {
-                    alert(data.error || 'Mirror failed');
+                    alert(data.error || 'Loop failed');
                     updateMirrorToggle(false);
                 }
             } catch (e) {
-                console.error('Mirror error:', e);
-                alert('Error running mirror. Check console.');
+                console.error('Loop error:', e);
+                alert('Error running loop. Check console.');
                 updateMirrorToggle(false);
             } finally {
                 toggle.disabled = false;
@@ -2049,7 +2049,7 @@
                 offLabel.style.padding = '4px 8px';
                 offLabel.style.borderRadius = '12px';
                 
-                card.classList.add('mirror-active');
+                card.classList.add('loop-active');
             } else {
                 // Inactive state - NO GLOW
                 onLabel.textContent = 'On';
@@ -2058,19 +2058,19 @@
                 onLabel.style.boxShadow = 'none';
                 onLabel.style.padding = '4px 8px';
                 onLabel.style.borderRadius = '12px';
-                
+
                 offLabel.textContent = 'Off';
                 offLabel.style.color = 'rgba(255,255,255,0.5)';
                 offLabel.style.background = 'rgba(255,255,255,0.05)';
                 offLabel.style.boxShadow = 'none';
                 offLabel.style.padding = '4px 8px';
                 offLabel.style.borderRadius = '12px';
-                
-                card.classList.remove('mirror-active');
+
+                card.classList.remove('loop-active');
             }
         }
 
-        // Initialize mirror toggle state on page load
+        // Initialize loop toggle state on page load
         async function initMirrorToggle() {
             try {
                 const response = await fetch('/api/settings');
@@ -2079,7 +2079,7 @@
                 const mirrorEnabled = data.auto_mirror === true;
                 updateMirrorToggle(mirrorEnabled);
             } catch (e) {
-                console.error('Failed to get mirror status:', e);
+                console.error('Failed to get loop status:', e);
                 updateMirrorToggle(false);
             }
         }

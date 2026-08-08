@@ -25,6 +25,10 @@ CHECK_SECONDS = config['check_seconds']
 _orders_being_placed = {}
 _ORDERS_TIMEOUT_SECONDS = 120  # Expire after 2 minutes if stuck
 
+def add_log(message):
+    """Log a message (prints to console; could be extended to write to DB/file)"""
+    print(message)
+
 def is_price_being_placed(price):
     """Check if a price is currently being processed, with timeout cleanup"""
     global _orders_being_placed
@@ -167,8 +171,27 @@ async def get_cached_positions(client):
         
         return (open_trades, running_trades, closed_trades)
 
+async def fetch_price_lnmarkets(client):
+    """Fetch BTC price from LN Markets (preferred over CoinGecko)"""
+    try:
+        # Try to get mark price from LN Markets
+        await _rate_limiter.wait()
+        ticker = await client.futures.get_ticker()
+        _rate_limiter.report_success()
+        
+        # LN Markets ticker returns mark price
+        if hasattr(ticker, 'mark_price'):
+            return float(ticker.mark_price)
+        elif hasattr(ticker, 'price'):
+            return float(ticker.price)
+        elif isinstance(ticker, dict):
+            return float(ticker.get('mark_price', ticker.get('price', 0)))
+    except Exception as e:
+        print(f"[PRICE] LN Markets price fetch failed: {e}")
+        raise  # Let caller handle fallback
+
 async def fetch_price_coingecko():
-    """Fetch BTC price from CoinGecko (more reliable than LN Markets)"""
+    """Fetch BTC price from CoinGecko (fallback only)"""
     import urllib.request
     import ssl
     
@@ -184,25 +207,36 @@ async def fetch_price_coingecko():
         return float(data['bitcoin']['usd'])
 
 async def get_cached_ticker(client):
-    """Get ticker price from CoinGecko (not LN Markets to avoid rate limits)"""
+    """Get ticker price from LN Markets first, fallback to CoinGecko"""
     global _ticker_cache
     now = time.time()
-    
+
     # Return cached price if fresh (within 60 seconds)
     if now - _ticker_cache['timestamp'] < 60 and _ticker_cache['price'] is not None:
         return _ticker_cache['price']
-    
+
     # Use lock to prevent multiple simultaneous fetches
     async with _ticker_cache['lock']:
         # Double-check after acquiring lock (another loop might have updated it)
         if now - _ticker_cache['timestamp'] < 60 and _ticker_cache['price'] is not None:
             return _ticker_cache['price']
-        
+
+        # Try LN Markets first
+        try:
+            price = await fetch_price_lnmarkets(client)
+            _ticker_cache['price'] = price
+            _ticker_cache['timestamp'] = time.time()
+            print(f"[PRICE] Updated BTC price from LN Markets: ${price:,.2f}")
+            return price
+        except Exception as e:
+            print(f"[PRICE] LN Markets failed, trying CoinGecko fallback...")
+
+        # Fallback to CoinGecko
         try:
             price = await fetch_price_coingecko()
             _ticker_cache['price'] = price
             _ticker_cache['timestamp'] = time.time()
-            print(f"[PRICE] Updated BTC price from CoinGecko: ${price:,.2f}")
+            print(f"[PRICE] Updated BTC price from CoinGecko (fallback): ${price:,.2f}")
             return price
         except Exception as e:
             print(f"[PRICE] CoinGecko error: {e}")
@@ -312,6 +346,9 @@ class Bot:
         pid = existing_pid  # Use existing PID if provided from sync
         loops_completed = 0
         
+        # Log task start for debugging duplicates
+        print(f"[TASK START] {name} - Task ID: {id(asyncio.current_task())}")
+        
         if pid:
             print(f"[{name}] Resuming with existing order: {pid[:8]}...")
         
@@ -390,12 +427,26 @@ class Bot:
                             continue
                         raise
                     
-                    # Check if order already exists
+                    # Check if order already exists (including running positions)
                     order_exists = False
                     for order in existing_orders:
                         if abs(order.price - price) < 0.5:  # Within $0.50
                             order_exists = True
                             break
+                    
+                    # Also check running positions - don't duplicate those either!
+                    if not order_exists:
+                        try:
+                            running_trades = await self.client.futures.isolated.get_running_trades()
+                            for pos in running_trades:
+                                if hasattr(pos, 'price') and abs(pos.price - price) < 0.5:
+                                    order_exists = True
+                                    dup_msg = f"[{name}] SKIPPED: Running position already exists at ${price:,.0f}"
+                                    print(dup_msg)
+                                    add_log(dup_msg)
+                                    break
+                        except Exception as e:
+                            print(f"[{name}] Warning: Could not check running positions: {e}")
                     
                     if order_exists:
                         print(f"[{name}] SKIPPED: Order already exists at ${price:,.0f}")
@@ -412,7 +463,9 @@ class Bot:
                     try:
                         resp = await self.client.futures.isolated.new_trade(params)
                         pid = resp.id if hasattr(resp, 'id') else str(resp)
-                        print(f"[{name}] Placed {entry_label}: ${qty} position @ ${price:,.0f} (market: ${current_price:,.0f}) with {leverage}x leverage")
+                        log_msg = f"[{name}] Placed {entry_label}: ${qty} position @ ${price:,.0f} (market: ${current_price:,.0f}) with {leverage}x leverage"
+                        print(log_msg)
+                        add_log(log_msg)  # Also add to UI-visible logs
                         _rate_limiter.report_success()
                     except Exception as order_error:
                         error_msg = str(order_error)
@@ -420,21 +473,31 @@ class Bot:
                         if '429' in error_msg or 'rate' in error_msg.lower():
                             _rate_limiter.report_error(is_rate_limit=True)
                             print(f"[{name}] RATE LIMIT: Too many requests, backing off...")
+                            add_log(f"[{name}] RATE LIMIT: Backing off for 30s")
                             unmark_price_placing(price)
                             await asyncio.sleep(30)  # Wait 30s after rate limit
                             continue
                         # Check for specific LN Markets error types
                         elif 'insufficient' in error_msg.lower() or 'balance' in error_msg.lower():
-                            print(f"[{name}] ERROR: Insufficient funds to place {entry_label} order @ ${price:,.0f}")
-                            print(f"[{name}] Need: ${qty:,.0f} margin, Error: {error_msg}")
+                            err = f"[{name}] ERROR: Insufficient funds to place {entry_label} order @ ${price:,.0f}"
+                            print(err)
+                            add_log(err)
                         elif 'margin' in error_msg.lower():
-                            print(f"[{name}] ERROR: Margin issue - {error_msg}")
+                            err = f"[{name}] ERROR: Margin issue - {error_msg}"
+                            print(err)
+                            add_log(err)
                         elif 'price' in error_msg.lower():
-                            print(f"[{name}] ERROR: Price invalid - {error_msg}")
+                            err = f"[{name}] ERROR: Price invalid - {error_msg}"
+                            print(err)
+                            add_log(err)
                         elif 'leverage' in error_msg.lower():
-                            print(f"[{name}] ERROR: Leverage issue - {error_msg}")
+                            err = f"[{name}] ERROR: Leverage issue - {error_msg}"
+                            print(err)
+                            add_log(err)
                         else:
-                            print(f"[{name}] ERROR placing order: {error_msg}")
+                            err = f"[{name}] ERROR placing order: {error_msg}"
+                            print(err)
+                            add_log(err)
                         # Remove from tracking and wait before retry
                         unmark_price_placing(price)
                         await asyncio.sleep(CHECK_SECONDS * 2)  # Wait longer after error
@@ -445,61 +508,123 @@ class Bot:
                     
                     # Set takeprofit immediately after order is placed (with rate limiting)
                     await _rate_limiter.wait()
-                    try:
-                        tp_params = UpdateTakeprofitParams(id=resp.id, value=float(exit_price))
-                        await self.client.futures.isolated.update_takeprofit(tp_params)
-                        print(f"[{name}] Takeprofit set @ ${exit_price:,.0f}")
-                        _rate_limiter.report_success()
-                    except Exception as tp_error:
-                        if '429' in str(tp_error):
-                            _rate_limiter.report_error(is_rate_limit=True)
-                            print(f"[{name}] RATE LIMIT: Could not set takeprofit due to rate limiting")
-                        else:
-                            print(f"[{name}] Warning: Could not set takeprofit: {tp_error}")
+                    tp_set = False
+                    tp_retries = 3
+                    for tp_attempt in range(tp_retries):
+                        try:
+                            tp_params = UpdateTakeprofitParams(id=resp.id, value=float(exit_price))
+                            await self.client.futures.isolated.update_takeprofit(tp_params)
+                            tp_msg = f"[{name}] Takeprofit set @ ${exit_price:,.0f}"
+                            print(tp_msg)
+                            add_log(tp_msg)
+                            _rate_limiter.report_success()
+                            tp_set = True
+                            break
+                        except Exception as tp_error:
+                            if '429' in str(tp_error):
+                                _rate_limiter.report_error(is_rate_limit=True)
+                                print(f"[{name}] RATE LIMIT: Could not set takeprofit (attempt {tp_attempt+1}/{tp_retries})")
+                                if tp_attempt < tp_retries - 1:
+                                    await asyncio.sleep(5 * (tp_attempt + 1))  # Backoff
+                                    continue
+                            else:
+                                err_msg = f"[{name}] Warning: Could not set takeprofit: {tp_error}"
+                                print(err_msg)
+                                add_log(err_msg)
+                                break
+                    
+                    if not tp_set:
+                        # Critical: takeprofit not set - cancel the order to prevent risk
+                        warn_msg = f"[{name}] CRITICAL: Order placed WITHOUT takeprofit! Cancelling for safety..."
+                        print(warn_msg)
+                        add_log(warn_msg)
+                        try:
+                            await self.client.futures.isolated.cancel_trade(resp.id)
+                            add_log(f"[{name}] Cancelled order without takeprofit")
+                            pid = None  # Reset so we can retry
+                        except Exception as cancel_err:
+                            add_log(f"[{name}] Failed to cancel order without TP: {cancel_err}")
                 
                 else:
-                    # Check position status using shared cache (all loops share same data)
-                    open_trades_list, running_trades_list, closed_trades_list = await get_cached_positions(self.client)
-                    
-                    # Safely extract IDs with error handling
+                    # STEP 1: Check RUNNING positions (LN Markets "Running" tab)
+                    # These are filled positions - we never want duplicates here
+                    await _rate_limiter.wait()
                     try:
-                        open_orders = {p.id for p in open_trades_list if hasattr(p, 'id')}
-                    except Exception as e:
-                        print(f"[{name}] Warning: Error reading open orders: {e}")
-                        open_orders = set()
-                    
-                    try:
-                        running_positions = {p.id for p in running_trades_list if hasattr(p, 'id')}
+                        running_trades_list = await self.client.futures.isolated.get_running_trades()
+                        _rate_limiter.report_success()
                     except Exception as e:
                         print(f"[{name}] Warning: Error reading running positions: {e}")
-                        running_positions = set()
+                        running_trades_list = []
                     
+                    # Check if this loop already has a running position
+                    for pos in running_trades_list:
+                        try:
+                            if hasattr(pos, 'price') and abs(pos.price - entry_price) < 0.5:
+                                if pid is None or pos.id != pid:
+                                    print(f"[{name}] FOUND RUNNING: Position already active @ ${entry_price:,.0f}")
+                                    pid = pos.id
+                                    break
+                        except:
+                            pass
+                    
+                    # STEP 2: Check OPEN orders (LN Markets "Open" tab)
+                    # These are pending orders - no duplicates here either
+                    await _rate_limiter.wait()
                     try:
-                        closed_ids = {t.id for t in closed_trades_list if hasattr(t, 'id')}
+                        open_trades_list = await self.client.futures.isolated.get_open_trades()
+                        _rate_limiter.report_success()
+                    except Exception as e:
+                        print(f"[{name}] Warning: Error reading open orders: {e}")
+                        open_trades_list = []
+                    
+                    # Check if this loop already has an open order
+                    for order in open_trades_list:
+                        try:
+                            if hasattr(order, 'price') and abs(order.price - entry_price) < 0.5:
+                                if pid is None or order.id != pid:
+                                    print(f"[{name}] FOUND OPEN: Order already pending @ ${entry_price:,.0f}")
+                                    pid = order.id
+                                    break
+                        except:
+                            pass
+                    
+                    # STEP 3: Check CLOSED orders (LN Markets "Closed" tab)
+                    # Look for completed loops that need to be reopened
+                    await _rate_limiter.wait()
+                    try:
+                        closed_trades_list = await self.client.futures.isolated.get_closed_trades()
+                        _rate_limiter.report_success()
                     except Exception as e:
                         print(f"[{name}] Warning: Error reading closed trades: {e}")
-                        closed_ids = set()
+                        closed_trades_list = []
                     
-                    if pid in open_orders:
-                        # Entry order still pending, do nothing
-                        pass
-                    elif pid in running_positions:
-                        # Entry filled, position running with takeprofit set
-                        print(f"[{name}] {entry_label} filled! Position running, takeprofit @ ${exit_price:,.0f}")
-                    elif pid in closed_ids:
-                        # Position closed (takeprofit executed)
-                        loops_completed += 1
-                        print(f"[{name}] {exit_label} filled (takeprofit)! LOOP #{loops_completed} complete")
-                        # Remove from tracking so we can place new entry order
-                        unmark_price_placing(entry_price)
-                        pid = None  # Reset to place new entry order
-                        just_completed_loop = True  # Flag to skip price validation on next iteration
-                    else:
-                        # Order ID not found anywhere — may have been cancelled
-                        print(f"[{name}] Order {pid[:8]} not found, resetting...")
-                        unmark_price_placing(entry_price)
-                        pid = None
-                        just_completed_loop = False  # Don't skip validation on unexpected reset
+                    # Check if our position just closed (loop completed)
+                    if pid:
+                        position_closed = False
+                        for trade in closed_trades_list:
+                            try:
+                                if hasattr(trade, 'id') and trade.id == pid:
+                                    position_closed = True
+                                    loops_completed += 1
+                                    print(f"[{name}] LOOP COMPLETE: Position closed @ ${exit_price:,.0f} (Loop #{loops_completed})")
+                                    unmark_price_placing(entry_price)
+                                    pid = None
+                                    just_completed_loop = True
+                                    break
+                            except:
+                                pass
+                        
+                        if not position_closed:
+                            # Our position is still active (running or open)
+                            pass
+                    
+                    # If no pid after all checks, we need to place a new order
+                    if not pid:
+                        # Only place if not already tracking this price
+                        if is_price_being_placed(entry_price):
+                            print(f"[{name}] WAITING: Another loop is placing order at ${entry_price:,.0f}")
+                        else:
+                            print(f"[{name}] READY: No existing order found at ${entry_price:,.0f}, will place new order")
                 
                 await asyncio.sleep(CHECK_SECONDS)
             except Exception as e:
@@ -558,11 +683,17 @@ class Bot:
                         # Skip if this loop was matched to an existing order during sync
                         # (another loop task is already tracking it)
                         if loop_id in existing_pids:
-                            print(f"Skipping loop '{loop.get('name')}' - already synced to existing order")
+                            print(f"[MAIN] Skipping loop '{loop.get('name')}' - already synced to existing order")
                             started_prices.add(unique_key)  # Mark as started so we don't try again
                             continue
                         
-                        print(f"Starting new loop: {loop.get('name', f'Loop {i}')} @ ${buy_price:,.0f}")
+                        # DEBUG: Check if task already exists
+                        if unique_key in active_loops:
+                            print(f"[MAIN] WARNING: Task already exists for {unique_key} but not in started_prices!")
+                            started_prices.add(unique_key)
+                            continue
+                        
+                        print(f"[MAIN] Starting new loop task: {loop.get('name', f'Loop {i}')} @ ${buy_price:,.0f} (key: {unique_key})")
                         # Pass existing PID if we found one during sync
                         existing_pid = existing_pids.get(loop_id)
                         task = asyncio.create_task(self.run_loop(loop, existing_pid))
@@ -578,14 +709,28 @@ class Bot:
     
     async def periodic_rescan(self, interval_minutes=5):
         """Periodically rescan and ensure all loops have orders placed"""
+        last_mirror_status = None  # Track status to avoid duplicate logs
         while True:
             try:
                 await asyncio.sleep(interval_minutes * 60)  # Wait for interval
                 
+                # CRITICAL: Only run rescan if auto_mirror is enabled
+                config = load_config()
+                current_status = config.get('auto_mirror', False)
+                
+                # Only log when status changes (not every interval)
+                if not current_status:
+                    if last_mirror_status is not False:
+                        print("[RESCAN] Auto mirror is OFF. Skipping periodic rescan.")
+                        add_log("[RESCAN] Auto mirror is OFF. Will check again in 5 minutes.")
+                    last_mirror_status = False
+                    continue
+                
+                last_mirror_status = True  # Update status tracker
+                
                 print(f"[RESCAN] Running periodic rescan to ensure all loops have orders...")
                 
                 # Get current state
-                config = load_config()
                 loops = config.get('loops', [])
                 enabled_loops = [l for l in loops if l.get('enabled', True)]
                 
